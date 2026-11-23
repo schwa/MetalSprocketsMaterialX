@@ -684,19 +684,20 @@ Coat, sheen, subsurface, thin film, specular_anisotropy, transmission_depth/scat
 ## 37: Lights and environment from MetalSprocketsLighting are not available to MaterialX shaders
 
 +++
-status: open
+status: blocked
 priority: medium
 kind: feature
 labels: effort:l, area:pbr, area:lighting
-depends: 22, 33
+depends: 22, 33, 35
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:38:54Z
+updated: 2026-11-23T14:18:12Z
 +++
 
 MaterialX surface shaders need light loops and IBL. MetalSprocketsLighting provides lights, shadows and environment for every renderer, but nothing connects it to MaterialX shading.
 
 - `2026-11-23T13:38:54Z`: Question 1 (design): Should MaterialX surface shading reuse the lighting loop and IBL already in MetalSprocketsLighting/MetalSprocketsPBR (lit by the PBR renderer once #35 hooks stitched inputs in), instead of this package evaluating lights itself? Recommended: Yes, reuse the PBR renderer's lighting
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:18:12Z`: Decided (#37-Q1): MaterialX surfaces are lit by the PBR renderer's existing lights and IBL. Nothing to build in this package: stitched surfaces already produce MXSurfaceInputs (#34, #36); lighting arrives when #35 hooks them into PBR.metal, which is blocked on #42.
 
 ---
 
@@ -1197,12 +1198,13 @@ The kernel source hard-codes the stitched function signature, so #22 will need e
 ## 62: Remaining RealityKit nodes have no Metal implementation
 
 +++
-status: new
+status: open
 priority: low
 kind: feature
 labels: area:nodes, area:integration, effort:l
 depends: 46
 created: 2026-11-23T14:17:55Z
+updated: 2026-11-23T14:18:00Z
 +++
 
 With Apple's nodedefs loaded (StandardLibrary.addingAppleShaderGraphNodes, #46), these RealityKit nodes used by Reality Composer Pro assets on this Mac still fail with unsupportedNode:
