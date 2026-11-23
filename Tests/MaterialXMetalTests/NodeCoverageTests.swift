@@ -35,7 +35,8 @@ struct NodeCoverageTests {
         #expect(coverage["ND_add_color3"] == .metal)
         #expect(coverage["ND_separate3_color3"] == .metal)
         #expect(coverage["ND_switch_color3"] == .nodeGraph)
-        #expect(coverage["ND_noise2d_float"] == .unsupported)
+        #expect(coverage["ND_noise2d_float"] == .metal)
+        #expect(coverage["ND_heighttonormal_vector3"] == .unsupported) // #77
     }
 }
 

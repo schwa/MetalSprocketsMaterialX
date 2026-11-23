@@ -82,8 +82,8 @@ struct StitchingTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let source = """
         <materialx version="1.39"><nodegraph name="g">
-          <noise2d name="n" type="float" />
-          <output name="out" type="float" nodename="n" />
+          <heighttonormal name="n" type="vector3" />
+          <output name="out" type="vector3" nodename="n" />
         </nodegraph></materialx>
         """
         let document = try MaterialXDocument(data: Data(source.utf8))

@@ -1301,14 +1301,18 @@ rotate2d, rotate3d, place2d, normalmap and heighttonormal have no implementation
 ## 67: Perlin noise nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, subtask, area:nodes
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:44:10Z
+closed: 2026-11-23T14:44:10Z
 +++
 
 noise2d, noise3d, fractal2d, fractal3d and cellnoise2d/3d (all variants) have no implementation. MaterialX's mx_noise GLSL/MSL is the reference. Acceptance: all variants stitch; values match the reference implementation at sample points. Part of #15.
+
+- `2026-11-23T14:44:10Z`: Ported MaterialX's mx_noise.glsl (Perlin, cell and fractal parts; OSL-derived, credited in NOTICE.md) to Sources/MaterialXMetalShaders/Metal/Noise.metal, with node functions for all 46 noise2d/noise3d/fractal2d/fractal3d (all types incl. FA) and cellnoise2d/3d nodedefs. NoiseTests checks cellnoise2d bit-exactly and noise2d to 1e-6 against an independent Swift transcription of MaterialX's hash and 2D Perlin, plus amplitude/pivot, lattice zeros and one-octave fractal. The example corpus now stitches every connected shader input (112, none unsupported). Worley/unified noise is #68.
 
 ---
 
@@ -1456,5 +1460,31 @@ created: 2026-11-23T14:41:35Z
 +++
 
 ND_heighttonormal_vector3 still fails with unsupportedNode. MaterialX's implementation (mx_heighttonormal_vector3.glsl) builds the normal from screen-space derivatives of the height and texture coordinate (dFdx/dFdy). Stitched visible functions have no access to screen-space derivatives, so the GLSL cannot be ported as is. Split out of #66.
+
+---
+
+## 78: No continuous integration pipeline configured
+
++++
+status: new
+priority: none
+kind: none
+created: 2026-11-23T14:41:52Z
++++
+
+Set up CI
+
+---
+
+## 79: Missing SwiftLint configuration for the project
+
++++
+status: new
+priority: none
+kind: none
+created: 2026-11-23T14:42:05Z
++++
+
+Set up swiftlint
 
 ---

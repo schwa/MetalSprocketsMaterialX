@@ -20,7 +20,8 @@ Copyright Contributors to the MaterialX Project. Licensed under the Apache Licen
 ## Open Shading Language
 
 `mx_hsvtorgb` and `mx_rgbtohsv` in `StandardLibrary.metal` are ported from MaterialX's `mx_hsv.glsl`, which is
-derived from Open Shading Language's `opcolor.cpp`:
+derived from Open Shading Language's `opcolor.cpp`, and `Noise.metal` is ported from MaterialX's `mx_noise.glsl`,
+which is derived from Open Shading Language's `oslnoise.h`. Both carry this notice:
 
 > Copyright (c) 2009-2010 Sony Pictures Imageworks Inc., et al. All Rights Reserved.
 >
