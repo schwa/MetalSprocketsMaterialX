@@ -334,15 +334,18 @@ Many nodedefs are implemented in stdlib_ng.mtlx / pbrlib_ng.mtlx as nodegraphs r
 ## 20: Node coverage is not tracked
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:s, area:nodes, area:testing
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:17:07Z
+closed: 2026-11-23T13:17:07Z
 +++
 
 There is no report of which nodedefs in the bundled libraries have a Metal function, a nodegraph implementation, or neither. Coverage regressions go unnoticed.
+
+- `2026-11-23T13:17:07Z`: GraphStitcher.coverage() classifies every nodedef as metal, nodeGraph (functional graph with all nodes supported) or unsupported. NodeCoverageTests compares against Tests/MaterialXMetalTests/Resources/node-coverage.txt (391 supported: 293 metal, 98 nodeGraph) and fails when a nodedef loses support; regenerate with MX_UPDATE_COVERAGE=1.
 
 ---
 
