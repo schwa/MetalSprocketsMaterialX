@@ -413,6 +413,7 @@ updated: 2026-11-23T12:56:27Z
 Image nodes need texture and sampler access. Whether [[stitchable]] functions can take texture2d/sampler arguments or must go through an argument buffer, and how that interacts with residency in MetalSprockets, is not investigated.
 
 - `2026-11-23T12:56:27Z`: Question 1 (design): Pass textures to stitched functions through an argument buffer (array of texture2d+sampler) given as a third graph argument, with image nodes taking a slot index from the parameter buffer? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -431,6 +432,7 @@ Every parameter takes one float4 slot, including floats. parameterData is [SIMD4
 
 - `2026-11-23T13:30:08Z`: Question 1 (decision): Leave the one-float4-slot-per-parameter layout as is (simple readers, 16 B per scalar; a 50-input material is under 1 KB) and close #24 with the typed setters, instead of packing scalars into shared slots? Recommended: Yes, keep the layout
 - `2026-11-23T13:38:12Z`: Related: #59 (layout is spread over four places).
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -543,6 +545,7 @@ updated: 2026-11-23T12:55:47Z
 Subgraphs that depend only on constants are stitched as function calls and evaluated per pixel. SceneSprocketsMaterialX already folds math on constants on the CPU (#609 in SceneSprockets).
 
 - `2026-11-23T13:31:01Z`: Question 1 (design): Add an opt-in GraphStitcher.foldConstants that stitches each constant-only subgraph separately, evaluates it once on the GPU with a 1-thread compute dispatch, and replaces it with one parameter slot (so no CPU copy of node semantics is needed), accepting that folded inputs are no longer editable by their original parameter names? Recommended: Yes, opt-in, GPU-evaluated
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -612,6 +615,7 @@ updated: 2026-11-23T12:56:27Z
 MetalSprocketsPBR (in SceneSprockets) shades with PBRMaterialUniforms and fixed texture slots. There is no defined way for a stitched MaterialX graph to supply base color, metallic, roughness, normal, emissive, occlusion, transmission, clearcoat, sheen, specular, iridescence, anisotropy etc. to that shader per pixel.
 
 - `2026-11-23T12:56:27Z`: Question 1 (design): Compile each connected surface-shader input (base_color, metalness, specular_roughness, normal, emission, coat, ...) into one stitched function that fills a shared MXSurfaceInputs struct matching PBRMaterialUniforms fields? Recommended: Yes, one function writing a struct
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -630,6 +634,7 @@ updated: 2026-11-23T12:56:27Z
 PBR.metal reads material values from uniforms and textures directly. There is no visible-function call site (e.g. evaluate material inputs at a surface point) that a stitched MaterialX graph could be linked into, so stitched graphs cannot drive the existing PBR renderer. The change lives in SceneSprockets.
 
 - `2026-11-23T12:56:27Z`: Question 1 (decision): Add an optional [[visible]] material-evaluation call to PBR.metal in SceneSprockets (function-constant gated, so materials without MaterialX pay nothing)? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -648,6 +653,7 @@ updated: 2026-11-23T13:03:07Z
 Coat, sheen, subsurface, thin film, specular_anisotropy, transmission_depth/scatter etc. have no exact equivalent in glTF PBR. The bundled translation graphs (bxdf/translation/standard_surface_to_gltf_pbr.mtlx, open_pbr_to_standard_surface.mtlx) are not used, and the approximations to accept are undecided.
 
 - `2026-11-23T13:03:07Z`: Question 1 (decision): Convert standard_surface/open_pbr_surface to glTF PBR inputs using the bundled translation nodegraphs (standard_surface_to_gltf_pbr.mtlx, open_pbr_to_standard_surface.mtlx), stitched like any functional graph, and accept their approximations (coat->clearcoat, sheen->sheen, subsurface dropped)? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -666,6 +672,7 @@ updated: 2026-11-23T13:38:54Z
 MaterialX surface shaders need light loops and IBL. MetalSprocketsLighting provides lights, shadows and environment for every renderer, but nothing connects it to MaterialX shading.
 
 - `2026-11-23T13:38:54Z`: Question 1 (design): Should MaterialX surface shading reuse the lighting loop and IBL already in MetalSprocketsLighting/MetalSprocketsPBR (lit by the PBR renderer once #35 hooks stitched inputs in), instead of this package evaluating lights itself? Recommended: Yes, reuse the PBR renderer's lighting
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -684,6 +691,7 @@ updated: 2026-11-23T13:35:07Z
 displacementshader, volumeshader and the displacement input on surfacematerial are ignored.
 
 - `2026-11-23T13:35:07Z`: Question 1 (decision): Defer displacement and volume shaders until #22 (normal/position in the shading context) and #33 (shader closures) exist, since displacement needs a vertex-stage hook and volumes need closures? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -702,6 +710,7 @@ updated: 2026-11-23T13:33:55Z
 surface_unlit, nprlib nodes (facingratio, viewdirection-based nodes) and gltf_unlit-style materials have no implementation.
 
 - `2026-11-23T13:33:55Z`: Question 1 (decision): Wait for #22 (shading context with view direction/normal) and #33 (surfaceshader representation) before implementing surface_unlit and nprlib, since both need values the stitched signature does not carry yet? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -738,6 +747,7 @@ updated: 2026-11-23T13:03:00Z
 MetalSprocketsMaterialX only exposes StitchedGraph.visibleFunction(). There is no Element or modifier that binds the parameter buffer, links the stitched function into a RenderPipeline, and updates parameters per frame.
 
 - `2026-11-23T13:03:00Z`: Question 1 (design): Should the first MetalSprockets element be an unlit MaterialXSurface modifier (fragment shader calls the stitched base-color function, binds the parameter buffer, re-stitches only on topology change), with the lit PBR path waiting on #34/#35? Recommended: Yes, unlit first
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -755,6 +765,7 @@ updated: 2026-11-23T12:55:47Z
 SceneSprockets has SceneSprocketsMaterialX (MaterialXDocument, its own XML parser and converter to PBRSceneMaterial, issues #528 #609 #620 there). This package duplicates the parser and aims to replace the per-pixel gaps listed in SceneSprockets #620. How the two meet (replace, wrap, or keep the CPU converter as a fallback) is undecided.
 
 - `2026-11-23T13:03:12Z`: Question 1 (decision): Should SceneSprocketsMaterialX keep its CPU converter as a fallback and use this package's Document/StandardLibrary for parsing, switching to stitched per-pixel evaluation once #35 lands? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -772,6 +783,7 @@ updated: 2026-11-23T12:55:47Z
 This package must not depend on SceneSprockets (SceneSprockets will depend on it), yet the PBR renderer it targets lives in SceneSprockets' MetalSprocketsPBR target. Where the PBR bridge code lives is undecided.
 
 - `2026-11-23T13:16:20Z`: Question 1 (decision): Put the MaterialX→PBR bridge in SceneSprockets (e.g. extend SceneSprocketsMaterialX to depend on this package), keeping MetalSprocketsMaterialX free of any SceneSprockets dependency? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -807,6 +819,7 @@ updated: 2026-11-23T12:55:47Z
 MetalSprocketsShaderGraph (node editor, own ShaderGraph.swift using function stitching) and MetalSprocketsAddOns' SimpleStitchedFunctionGraph overlap with this package. Whether ShaderGraph can load/save MaterialX or share the node library is not decided.
 
 - `2026-11-23T13:35:24Z`: Question 1 (decision): Make MetalSprocketsShaderGraph use this package as its document format and node library (load/save .mtlx, node palette from StandardLibrary, compile with GraphStitcher), retire SimpleStitchedFunctionGraph in MetalSprocketsAddOns in favor of GraphStitcher, and build the MaterialX node editor (#56) on ShaderGraph's editor UI? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -825,6 +838,7 @@ Reality Composer Pro and USD files on this machine use Apple's MaterialX extensi
 
 - `2026-11-23T13:35:18Z`: Apple's nodedefs are in /System/Library/SubFrameworks/ShaderGraph.framework/Versions/A/Resources/MaterialX/Apple/apple_nodedefs (14 files, ~1,450 nodedefs, MaterialX 1.38, generated). Their implementations are target="realitykit" function names with no source, and they use types the bundled libraries lack (integer2, ...). The files are Apple's and cannot be vendored.
 - `2026-11-23T13:35:18Z`: Question 1 (design): Support RealityKit documents by loading Apple's nodedefs from the system ShaderGraph.framework at run time (opt-in, so they parse and validate) and implementing their Metal functions by hand, starting with the nodes the Reality Composer Pro sample assets actually use? Recommended: Yes, opt-in loading plus the most-used nodes first
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -843,6 +857,7 @@ updated: 2026-11-23T13:03:12Z
 There is no rendering test. GoldenImage is used by the other packages for this. The MaterialX test suite materials (resources/Materials/TestSuite in the MaterialX repo) are not on disk and are not vendored.
 
 - `2026-11-23T13:03:12Z`: Question 1 (decision): Add golden-image tests (GoldenImage package) once #41 provides a render element, starting with a flat unlit quad per test material? Recommended: Yes
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -933,6 +948,7 @@ Package.swift declares iOS 26 and visionOS 26 but only macOS tests have run.
 
 - `2026-11-23T13:18:15Z`: xcb builds Swift packages with 'swift build' even with -d ios / -d visionos (xcb build --dry-run --scheme MetalSprocketsMaterialX-Package -d visionos prints 'swift build'; same in MetalSprocketsParticles), so its 'Build succeeded' for those destinations is a macOS build and does not verify iOS/visionOS.
 - `2026-11-23T13:18:15Z`: Question 1 (decision): May I run xcodebuild directly (-scheme MetalSprocketsMaterialX-Package -destination generic/platform=iOS and visionOS) for this check, since xcb only runs swift build for packages? Recommended: Yes, for this one-off verification
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
@@ -969,6 +985,7 @@ updated: 2026-11-23T13:35:00Z
 There is no example that loads a .mtlx file and renders it on a mesh with MetalSprockets, nor a DemoKit / MetalSprocketsExamples entry.
 
 - `2026-11-23T13:35:00Z`: Question 1 (decision): Build the demo (a macOS app via 'xcb new' that loads a .mtlx with DocumentWatcher and shows each stitched output on a quad, plus the mtlx stitch report) after #41 provides the render element, rather than writing ad-hoc render code in the demo now? Recommended: Yes, after #41
+- `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 
 ---
 
