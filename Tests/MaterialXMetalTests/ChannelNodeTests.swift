@@ -30,7 +30,7 @@ struct ChannelNodeTests {
         let document = try Document(data: Data(xml.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
-        return try StitchingTests().evaluate(stitched, device: device, returnType: type)[0]
+        return try StitchingTests().evaluate(stitched, device: device)[0]
     }
 
     @Test func extractReadsIndexedComponent() throws {
@@ -98,11 +98,11 @@ struct ShaderInputStitchingTests {
         let shader = try #require(document.nodes.first { $0.name == "shader" })
 
         let baseColor = try stitcher.stitch(try #require(shader.input("base_color")), in: document, functionName: "materialx_graph")
-        let color = try StitchingTests().evaluate(baseColor, device: device, returnType: "color3")[0]
+        let color = try StitchingTests().evaluate(baseColor, device: device)[0]
         #expect(abs(color.x - 0.4) < 1e-6 && abs(color.y - 0.8) < 1e-6 && abs(color.z - 1.2) < 1e-6)
 
         let roughness = try stitcher.stitch(try #require(shader.input("specular_roughness")), in: document, functionName: "materialx_graph")
-        #expect(try StitchingTests().evaluate(roughness, device: device, returnType: "float")[0].x == 0.75)
+        #expect(try StitchingTests().evaluate(roughness, device: device)[0].x == 0.75)
 
         #expect(throws: MaterialXError.self) {
             try stitcher.stitch(try #require(shader.input("metalness")), in: document, functionName: "materialx_graph")
@@ -208,7 +208,7 @@ struct MultiOutputTests {
 
     @Test func functionalGraphOutputIsSelected() throws {
         let (stitched, device) = try stitch(output: "high")
-        #expect(try StitchingTests().evaluate(stitched, device: device, returnType: "vector2")[0] == [3, 4, 0, 1])
+        #expect(try StitchingTests().evaluate(stitched, device: device)[0] == [3, 4, 0, 1])
     }
 }
 
@@ -280,7 +280,7 @@ struct ConditionalNodeTests {
         let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
-        return try StitchingTests().evaluate(stitched, device: device, returnType: type)[0]
+        return try StitchingTests().evaluate(stitched, device: device)[0]
     }
 
     @Test func switchPicksInputByWhich() throws {
@@ -343,13 +343,13 @@ struct ColorManagementTests {
 /// #5: colorspace and unit attributes on values are applied.
 @Suite(.serialized)
 struct ColorSpaceAndUnitTests {
-    func evaluate(_ xml: String, type: String = "color3", configure: (inout GraphStitcher) -> Void = { _ in }) throws -> SIMD4<Float> {
+    func evaluate(_ xml: String, configure: (inout GraphStitcher) -> Void = { _ in }) throws -> SIMD4<Float> {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let document = try Document(data: Data(xml.utf8))
         var stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         configure(&stitcher)
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph", documentColorSpace: document.colorSpace)
-        return try StitchingTests().evaluate(stitched, device: device, returnType: type)[0]
+        return try StitchingTests().evaluate(stitched, device: device)[0]
     }
 
     static let decoded = pow((0.5 + 0.055) / 1.055, 2.4) as Float
@@ -389,8 +389,8 @@ struct ColorSpaceAndUnitTests {
           <output name="out" type="float" nodename="n" />
         </nodegraph></materialx>
         """
-        #expect(abs(try evaluate(xml, type: "float").x - 0.1) < 1e-6)
-        #expect(abs(try evaluate(xml, type: "float") { $0.targetUnits["distance"] = "millimeter" }.x - 100) < 1e-4)
+        #expect(abs(try evaluate(xml).x - 0.1) < 1e-6)
+        #expect(abs(try evaluate(xml) { $0.targetUnits["distance"] = "millimeter" }.x - 100) < 1e-4)
     }
 }
 
@@ -408,7 +408,7 @@ struct DeepGraphTests {
         let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(nodes)<output name=\"out\" type=\"float\" nodename=\"n\(count)\" /></nodegraph></materialx>"
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
-        #expect(try StitchingTests().evaluate(stitched, device: device, returnType: "float")[0].x == Float(count))
+        #expect(try StitchingTests().evaluate(stitched, device: device)[0].x == Float(count))
     }
 
     @Test func cycleIsReported() throws {
@@ -515,5 +515,26 @@ struct GraphPlanTests {
         let document = try Document(data: Data(xml.utf8))
         let plan = try stitcher.plan(try #require(document.nodeGraph("g")), functionName: "f", documentColorSpace: document.colorSpace)
         #expect(plan.calls.contains { ($0.origin ?? "").hasPrefix("n.in1#colorspace/") })
+    }
+}
+
+/// #61: StitchedGraph.evaluate(at:) is the one way to run a graph on the GPU.
+@Suite(.serialized)
+struct EvaluateTests {
+    @Test func evaluatesEachTexcoordAndWidensBooleans() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <texcoord name="uv" type="vector2" />
+          <extract name="u" type="float"><input name="in" type="vector2" nodename="uv" /><input name="index" type="integer" value="0" /></extract>
+          <ifgreater name="n" type="boolean"><input name="value1" type="float" nodename="u" /><input name="value2" type="float" value="0.5" /></ifgreater>
+          <output name="out" type="boolean" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let values = try stitched.evaluate(at: [[0.25, 0], [0.75, 0], [0.9, 0]])
+        #expect(values.map(\.x) == [0, 1, 1])
+        #expect(try stitched.evaluate(at: []).isEmpty)
     }
 }

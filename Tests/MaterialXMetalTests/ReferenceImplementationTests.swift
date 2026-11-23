@@ -121,7 +121,7 @@ struct ReferenceImplementationTests {
             throw error
         }
         let graph = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
-        return try StitchingTests().evaluate(graph, device: device, returnType: outputType.rawValue)[0]
+        return try StitchingTests().evaluate(graph, device: device)[0]
     }
 
     @Test func nodesMatchMaterialXReferenceExpressions() throws {

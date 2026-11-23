@@ -1129,12 +1129,13 @@ Consequences:
 ## 61: GPU evaluation of stitched graphs exists only as copied test code
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: area:architecture, effort:s
 created: 2026-11-23T13:37:47Z
-updated: 2026-11-23T13:38:12Z
+updated: 2026-11-23T13:44:03Z
+closed: 2026-11-23T13:44:03Z
 +++
 
 Running a stitched graph and reading its result back is implemented only in tests:
@@ -1144,5 +1145,6 @@ Running a stitched graph and reading its result back is implemented only in test
 The kernel source hard-codes the stitched function signature, so #22 will need every copy updated. The mtlx CLI and debugging tools cannot evaluate a graph.
 
 - `2026-11-23T13:38:12Z`: Related: #22 (signature change would update every copy) and #58.
+- `2026-11-23T13:44:03Z`: Public StitchedGraph.evaluate(at:device:) runs a graph per texture coordinate and returns float4 results (any output type: float…float4, color, integer, boolean). The shared test helper StitchingTests.evaluate is now a one-line wrapper and the returnType arguments are gone from all call sites; ReferenceImplementationTests uses it too. StitchingPerformanceTests keeps its own kernels on purpose: it measures direct vs function-table linking. Test: EvaluateTests.
 
 ---

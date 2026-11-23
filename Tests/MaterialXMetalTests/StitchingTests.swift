@@ -28,49 +28,11 @@ struct StitchingTests {
     </materialx>
     """
 
-    /// A kernel that calls the stitched graph and widens its `returnType` result to float4 (missing components 0, w 1).
-    static func kernelSource(returnType: String) -> String {
-        let metalType = ["float": "float", "vector2": "float2", "vector3": "float3", "color3": "float3", "vector4": "float4", "color4": "float4"][returnType] ?? returnType
-        return """
-        #include <metal_stdlib>
-        using namespace metal;
-        static float4 widen(float v) { return float4(v, 0, 0, 1); }
-        static float4 widen(float2 v) { return float4(v, 0, 1); }
-        static float4 widen(float3 v) { return float4(v, 1); }
-        static float4 widen(float4 v) { return v; }
-        [[visible]] \(metalType) materialx_graph(float2 texcoord, constant float4 *parameters);
-        kernel void evaluate(device float4 *out [[buffer(0)]], constant float4 *parameters [[buffer(1)]], uint id [[thread_position_in_grid]]) {
-            out[id] = widen(materialx_graph(float2(id, 0) / 4.0, parameters));
-        }
-        """
-    }
+    /// The texture coordinates the shared test helper samples: (0, 0), (0.25, 0), (0.5, 0), (0.75, 0).
+    static let sampleTexcoords: [SIMD2<Float>] = (0..<4).map { [Float($0) / 4, 0] }
 
-    func evaluate(_ graph: StitchedGraph, device: MTLDevice, returnType: String = "color3") throws -> [SIMD4<Float>] {
-        let library = try device.makeLibrary(source: Self.kernelSource(returnType: returnType), options: nil)
-        let descriptor = MTLComputePipelineDescriptor()
-        descriptor.computeFunction = library.makeFunction(name: "evaluate")
-        let linked = MTLLinkedFunctions()
-        linked.privateFunctions = [graph.function]
-        descriptor.linkedFunctions = linked
-        let pipeline = try device.makeComputePipelineState(descriptor: descriptor, options: [], reflection: nil)
-        let count = 4
-        let output = try #require(device.makeBuffer(length: MemoryLayout<SIMD4<Float>>.stride * count))
-        // Pad to one slot: Metal rejects zero-length buffers, and copying 16 bytes from an empty array over-reads.
-        let padded = graph.parameterData.isEmpty ? [SIMD4<Float>.zero] : graph.parameterData
-        let parameters = try #require(device.makeBuffer(bytes: padded, length: MemoryLayout<SIMD4<Float>>.stride * padded.count))
-        let queue = try #require(device.makeCommandQueue())
-        let commandBuffer = try #require(queue.makeCommandBuffer())
-        let encoder = try #require(commandBuffer.makeComputeCommandEncoder())
-        encoder.setComputePipelineState(pipeline)
-        encoder.setBuffer(output, offset: 0, index: 0)
-        encoder.setBuffer(parameters, offset: 0, index: 1)
-        encoder.dispatchThreads(MTLSize(width: count, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: count, height: 1, depth: 1))
-        encoder.endEncoding()
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        try #require(commandBuffer.status == .completed, "\(String(describing: commandBuffer.error))")
-        let pointer = output.contents().bindMemory(to: SIMD4<Float>.self, capacity: count)
-        return (0..<count).map { pointer[$0] }
+    func evaluate(_ graph: StitchedGraph, device: MTLDevice) throws -> [SIMD4<Float>] {
+        try graph.evaluate(at: Self.sampleTexcoords, device: device)
     }
 
     @Test func stitchedGraphMatchesExpectedValues() throws {
