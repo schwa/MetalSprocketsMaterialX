@@ -678,11 +678,14 @@ status: open
 priority: low
 kind: feature
 labels: effort:m, area:shading
+depends: 22, 33
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:33:55Z
 +++
 
 surface_unlit, nprlib nodes (facingratio, viewdirection-based nodes) and gltf_unlit-style materials have no implementation.
+
+- `2026-11-23T13:33:55Z`: Question 1 (decision): Wait for #22 (shading context with view direction/normal) and #33 (surfaceshader representation) before implementing surface_unlit and nprlib, since both need values the stitched signature does not carry yet? Recommended: Yes
 
 ---
 
