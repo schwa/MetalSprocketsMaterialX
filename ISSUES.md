@@ -292,15 +292,18 @@ image, tiledimage, triplanarprojection, hextiledimage, gltf_image/gltf_colorimag
 ## 19: Functional nodegraphs (*_ng.mtlx) are not used as node implementations
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:l, area:nodes, area:stitching
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:01:36Z
+closed: 2026-11-23T13:01:36Z
 +++
 
 Many nodedefs are implemented in stdlib_ng.mtlx / pbrlib_ng.mtlx as nodegraphs rather than source. StandardLibrary loads them but GraphStitcher does not inline a nodegraph implementation when a node has no Metal function, so those nodes fail with unsupportedNode.
+
+- `2026-11-23T13:01:36Z`: GraphStitcher inlines a nodedef's functional nodegraph when no Metal function exists (nested scopes, interface inputs bound to caller arguments, unbound ones become parameters). StandardLibrary(documents:) / merging(_:) add document-local nodedefs. Multi-output implementation graphs still wait on #25. Test: FunctionalNodeGraphTests.
 
 ---
 

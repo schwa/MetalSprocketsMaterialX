@@ -104,3 +104,48 @@ struct ShaderInputStitchingTests {
         }
     }
 }
+
+/// #19: nodes without a Metal function are expanded from their functional nodegraph.
+@Suite(.serialized)
+struct FunctionalNodeGraphTests {
+    static let source = """
+    <materialx version="1.39">
+      <nodedef name="ND_scale_and_bias_color3" node="scale_and_bias">
+        <input name="in" type="color3" value="0, 0, 0" />
+        <input name="scale" type="float" value="2" />
+        <output name="out" type="color3" />
+      </nodedef>
+      <nodegraph name="NG_scale_and_bias_color3" nodedef="ND_scale_and_bias_color3">
+        <multiply name="scaled" type="color3">
+          <input name="in1" type="color3" interfacename="in" />
+          <input name="in2" type="float" interfacename="scale" />
+        </multiply>
+        <add name="biased" type="color3">
+          <input name="in1" type="color3" nodename="scaled" />
+          <input name="in2" type="float" value="0.5" />
+        </add>
+        <output name="out" type="color3" nodename="biased" />
+      </nodegraph>
+      <nodegraph name="g">
+        <scale_and_bias name="first" type="color3">
+          <input name="in" type="color3" value="0.1, 0.2, 0.3" />
+        </scale_and_bias>
+        <scale_and_bias name="n" type="color3">
+          <input name="in" type="color3" nodename="first" />
+          <input name="scale" type="float" value="1" />
+        </scale_and_bias>
+        <output name="out" type="color3" nodename="n" />
+      </nodegraph>
+    </materialx>
+    """
+
+    @Test func customNodeDefIsInlinedTwice() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(Self.source.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: StandardLibrary.shared.merging([document]))
+        let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
+        // ((0.1, 0.2, 0.3) * 2 + 0.5) * 1 + 0.5
+        let value = try StitchingTests().evaluate(stitched, device: device)[0]
+        #expect(abs(value.x - 1.2) < 1e-5 && abs(value.y - 1.4) < 1e-5 && abs(value.z - 1.6) < 1e-5)
+    }
+}

@@ -22,15 +22,27 @@ public struct StandardLibrary: Sendable {
         }
     }()
 
+    /// The documents the library was built from, in load order.
+    public private(set) var documents: [Document]
+
     public init(librariesURL: URL) throws {
+        var documents: [Document] = []
+        let enumerator = FileManager.default.enumerator(at: librariesURL, includingPropertiesForKeys: nil)
+        while let url = enumerator?.nextObject() as? URL {
+            guard url.pathExtension == "mtlx" else { continue }
+            documents.append(try Document(url: url))
+        }
+        self.init(documents: documents)
+    }
+
+    /// A library of the nodedefs and functional nodegraphs in `documents`. Later documents override earlier ones.
+    public init(documents: [Document]) {
+        self.documents = documents
         var nodeDefs: [String: NodeDef] = [:]
         var nodeGraphs: [String: NodeGraph] = [:]
         var graphsByName: [String: NodeGraph] = [:]
         var implementations: [(nodeDef: String, nodeGraph: String)] = []
-        let enumerator = FileManager.default.enumerator(at: librariesURL, includingPropertiesForKeys: nil)
-        while let url = enumerator?.nextObject() as? URL {
-            guard url.pathExtension == "mtlx" else { continue }
-            let document = try Document(url: url)
+        for document in documents {
             for nodeDef in document.nodeDefs {
                 nodeDefs[nodeDef.name] = nodeDef
             }
@@ -52,6 +64,11 @@ public struct StandardLibrary: Sendable {
         self.nodeDefs = nodeDefs.mapValues { Self.resolveInheritance($0, in: nodeDefs) }
         self.nodeGraphs = nodeGraphs
         nodeDefsByCategory = Dictionary(grouping: self.nodeDefs.values, by: \.node)
+    }
+
+    /// This library plus the custom nodedefs and nodegraph implementations declared in `documents`.
+    public func merging(_ documents: [Document]) -> Self {
+        Self(documents: self.documents + documents)
     }
 
     static func resolveInheritance(_ nodeDef: NodeDef, in nodeDefs: [String: NodeDef], visited: Set<String> = []) -> NodeDef {
