@@ -431,12 +431,13 @@ Image nodes need texture and sampler access. Whether [[stitchable]] functions ca
 ## 24: Parameter buffer layout wastes space and has no typed access
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: effort:s, area:stitching
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:03:28Z
+closed: 2026-11-23T14:03:28Z
 +++
 
 Every parameter takes one float4 slot, including floats. parameterData is [SIMD4<Float>] indexed by slot number; there is no typed setter by name (e.g. set("tint", to: SIMD3)) and no validation of type on write.
@@ -444,6 +445,7 @@ Every parameter takes one float4 slot, including floats. parameterData is [SIMD4
 - `2026-11-23T13:30:08Z`: Question 1 (decision): Leave the one-float4-slot-per-parameter layout as is (simple readers, 16 B per scalar; a 50-input material is under 1 KB) and close #24 with the typed setters, instead of packing scalars into shared slots? Recommended: Yes, keep the layout
 - `2026-11-23T13:38:12Z`: Related: #59 (layout is spread over four places).
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:03:28Z`: Per #24-Q1: the one-float4-slot-per-parameter layout stays (simple readers; 16 B per scalar, a 50-input material is under 1 KB). Typed access landed earlier: StitchedGraph.set(_:to:) for Value/Float/SIMD3/SIMD4 with type and component-count checks (ParameterSetterTests). Layout ownership is tracked in #59.
 
 ---
 
@@ -953,12 +955,13 @@ The package has no .swiftlint.yml, no GitHub Actions / Buildkite config and no .
 ## 52: No iOS / visionOS build verified
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:s, area:build
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:03:21Z
+closed: 2026-11-23T14:03:21Z
 +++
 
 Package.swift declares iOS 26 and visionOS 26 but only macOS tests have run.
@@ -966,6 +969,7 @@ Package.swift declares iOS 26 and visionOS 26 but only macOS tests have run.
 - `2026-11-23T13:18:15Z`: xcb builds Swift packages with 'swift build' even with -d ios / -d visionos (xcb build --dry-run --scheme MetalSprocketsMaterialX-Package -d visionos prints 'swift build'; same in MetalSprocketsParticles), so its 'Build succeeded' for those destinations is a macOS build and does not verify iOS/visionOS.
 - `2026-11-23T13:18:15Z`: Question 1 (decision): May I run xcodebuild directly (-scheme MetalSprocketsMaterialX-Package -destination generic/platform=iOS and visionOS) for this check, since xcb only runs swift build for packages? Recommended: Yes, for this one-off verification
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:03:21Z`: Verified with xcodebuild (approved in #52-Q1): 'xcodebuild build -scheme MetalSprocketsMaterialX-Package -destination generic/platform=iOS' and '...generic/platform=visionOS' (CODE_SIGNING_ALLOWED=NO, -skipPackagePluginValidation) both BUILD SUCCEEDED, including the MetalCompilerPlugin node library. The CI workflow from #51 runs the same builds on every push. No code changes.
 
 ---
 
