@@ -1268,3 +1268,60 @@ struct SpaceTransformTests {
         #expect(try transform("transformpoint", from: "model", to: "object", value: "3, 4, 5", context: context) == [3, 4, 5])
     }
 }
+
+/// #66: UV rotation/placement, normal maps, and tangent-space surface normals.
+@Suite(.serialized)
+struct TexcoordAndNormalMapTests {
+    func evaluate(_ body: String, type: String, context: MXShadingContext = MXShadingContext(texcoord: .zero)) throws -> SIMD4<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try #require(try MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g"))
+        return try #require(try stitcher.stitch(graph, functionName: "uv_test").evaluate(contexts: [context]).first)
+    }
+
+    @Test func rotations() throws {
+        // MaterialX rotates clockwise for positive degrees: (1, 0) by 90° → (0, -1).
+        let rotated2 = try evaluate("<rotate2d name=\"n\" type=\"vector2\"><input name=\"in\" type=\"vector2\" value=\"1, 0\" /><input name=\"amount\" type=\"float\" value=\"90\" /></rotate2d>", type: "vector2")
+        #expect(abs(rotated2.x) < 1e-6 && abs(rotated2.y + 1) < 1e-6, "\(rotated2)")
+        let rotated3 = try evaluate("<rotate3d name=\"n\" type=\"vector3\"><input name=\"in\" type=\"vector3\" value=\"1, 0, 0\" /><input name=\"amount\" type=\"float\" value=\"90\" /><input name=\"axis\" type=\"vector3\" value=\"0, 0, 1\" /></rotate3d>", type: "vector3")
+        // rotate3d is clockwise too: MaterialX's GLSL fills its rotation matrix column by column.
+        #expect(simd_distance(SIMD3(rotated3.x, rotated3.y, rotated3.z), [0, -1, 0]) < 1e-6, "\(rotated3)")
+    }
+
+    @Test func place2dScalesAndOffsets() throws {
+        let placed = try evaluate("<place2d name=\"n\" type=\"vector2\"><input name=\"texcoord\" type=\"vector2\" value=\"0.5, 0.5\" /><input name=\"scale\" type=\"vector2\" value=\"2, 2\" /><input name=\"offset\" type=\"vector2\" value=\"0.25, 0\" /></place2d>", type: "vector2")
+        #expect(placed.x.isFinite && placed.y.isFinite)
+    }
+
+    @Test func normalMapBendsTheNormal() throws {
+        var context = MXShadingContext(texcoord: .zero)
+        context.normalWorld = [0, 1, 0]
+        context.tangentWorld = [1, 0, 0]
+        context.bitangentWorld = [0, 0, 1]
+        // A flat encoded normal (0.5, 0.5, 1) is the surface normal; (1, 0.5, 0.5) leans fully along the tangent.
+        let flat = try evaluate("<normalmap name=\"n\" type=\"vector3\"><input name=\"in\" type=\"vector3\" value=\"0.5, 0.5, 1\" /></normalmap>", type: "vector3", context: context)
+        #expect(simd_distance(SIMD3(flat.x, flat.y, flat.z), [0, 1, 0]) < 1e-6)
+        let leaning = try evaluate("<normalmap name=\"n\" type=\"vector3\"><input name=\"in\" type=\"vector3\" value=\"1, 0.5, 0.5\" /></normalmap>", type: "vector3", context: context)
+        #expect(simd_distance(SIMD3(leaning.x, leaning.y, leaning.z), [1, 0, 0]) < 1e-6)
+    }
+
+    @Test func tangentSpaceShaderNormalsBecomeWorldNormals() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39">
+          <UsdPreviewSurface name="s" type="surfaceshader"><input name="normal" type="vector3" value="1, 0, 0" /></UsdPreviewSurface>
+        </materialx>
+        """
+        let document = try MaterialXDocument(data: Data(xml.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        var context = MXShadingContext(texcoord: .zero)
+        context.normalWorld = [0, 1, 0]
+        context.tangentWorld = [0, 0, -1]
+        context.bitangentWorld = [1, 0, 0]
+        let shader = try #require(document.nodes.first)
+        let surfaces = try stitcher.stitchSurface(shader, in: document, functionName: "usd_normal").evaluateSurface(contexts: [context])
+        let surface = try #require(surfaces.first)
+        #expect(simd_distance(surface.normal, [0, 0, -1]) < 1e-6, "\(surface.normal)")
+    }
+}

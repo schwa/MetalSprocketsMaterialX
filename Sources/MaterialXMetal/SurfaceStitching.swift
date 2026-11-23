@@ -13,6 +13,14 @@ public struct SurfaceMapping: Sendable {
         public var source: String
         /// The `MXSurfaceInputs` field (and `mx_surface_set_<field>` setter).
         public var field: String
+        /// A function applied to the value first, taking the context then the value; for example
+        /// `mx_tangent_to_world_vector3` for tangent-space normals.
+        public var conversion: String?
+    }
+
+    /// A tangent-space normal input, converted to the world normal `field`.
+    public static func tangentSpaceNormal(_ input: String, field: String = "normal") -> Field {
+        Field(source: input, field: field, conversion: "mx_tangent_to_world_vector3")
     }
 
     /// Read straight from the shader's inputs.
@@ -21,8 +29,8 @@ public struct SurfaceMapping: Sendable {
     /// Read from the last translation node's outputs.
     public var translatedFields: [Field]
 
-    public init(_ fields: [(input: String, field: String)], translations: [String] = [], translatedFields: [(output: String, field: String)] = []) {
-        self.fields = fields.map { Field(source: $0.input, field: $0.field) }
+    public init(_ fields: [(input: String, field: String)], extraFields: [Field] = [], translations: [String] = [], translatedFields: [(output: String, field: String)] = []) {
+        self.fields = fields.map { Field(source: $0.input, field: $0.field) } + extraFields
         self.translations = translations
         self.translatedFields = translatedFields.map { Field(source: $0.output, field: $0.field) }
     }
@@ -43,19 +51,25 @@ public struct SurfaceMapping: Sendable {
             ("sheen_roughness", "sheenRoughness"), ("clearcoat", "clearcoat"), ("clearcoat_roughness", "clearcoatRoughness"),
             ("clearcoat_normal", "clearcoatNormal"), ("emissive", "emissive"),
         ]),
-        // UsdPreviewSurface's normal is in tangent space; it is not mapped until normal maps are supported.
-        "UsdPreviewSurface": Self([
-            ("diffuseColor", "baseColor"), ("emissiveColor", "emissive"), ("specularColor", "specularColor"),
-            ("metallic", "metallic"), ("roughness", "roughness"), ("clearcoat", "clearcoat"),
-            ("clearcoatRoughness", "clearcoatRoughness"), ("opacity", "opacity"), ("ior", "ior"), ("occlusion", "occlusion"),
-        ]),
-        // RealityKit's PBR shader (Apple's nodedefs, StandardLibrary.addingAppleShaderGraphNodes). Its normal is in
-        // tangent space like UsdPreviewSurface's and is not mapped yet.
-        "realitykit_pbr_surfaceshader": Self([
-            ("baseColor", "baseColor"), ("emissiveColor", "emissive"), ("roughness", "roughness"), ("metallic", "metallic"),
-            ("ambientOcclusion", "occlusion"), ("specular", "specular"), ("opacity", "opacity"), ("clearcoat", "clearcoat"),
-            ("clearcoatRoughness", "clearcoatRoughness"),
-        ]),
+        // UsdPreviewSurface's normal is in tangent space.
+        "UsdPreviewSurface": Self(
+            [
+                ("diffuseColor", "baseColor"), ("emissiveColor", "emissive"), ("specularColor", "specularColor"),
+                ("metallic", "metallic"), ("roughness", "roughness"), ("clearcoat", "clearcoat"),
+                ("clearcoatRoughness", "clearcoatRoughness"), ("opacity", "opacity"), ("ior", "ior"), ("occlusion", "occlusion"),
+            ],
+            extraFields: [tangentSpaceNormal("normal")]
+        ),
+        // RealityKit's PBR shader (Apple's nodedefs, StandardLibrary.addingAppleShaderGraphNodes). Its normals are in
+        // tangent space like UsdPreviewSurface's.
+        "realitykit_pbr_surfaceshader": Self(
+            [
+                ("baseColor", "baseColor"), ("emissiveColor", "emissive"), ("roughness", "roughness"), ("metallic", "metallic"),
+                ("ambientOcclusion", "occlusion"), ("specular", "specular"), ("opacity", "opacity"), ("clearcoat", "clearcoat"),
+                ("clearcoatRoughness", "clearcoatRoughness"),
+            ],
+            extraFields: [tangentSpaceNormal("normal"), tangentSpaceNormal("clearcoatNormal", field: "clearcoatNormal")]
+        ),
         "standard_surface": Self(
             [("normal", "normal"), ("coat_normal", "clearcoatNormal"), ("specular_IOR", "ior"), ("specular", "specular"), ("specular_color", "specularColor")],
             translations: ["standard_surface_to_gltf_pbr"],
@@ -143,7 +157,10 @@ public extension GraphStitcher {
         var surface = GraphPlan.Operand.surface
         for field in mapping.fields {
             guard let definition = nodeDef.input(field.source) else { continue }
-            let value = try builder.resolve(input: shader.input(field.source), definition: definition, owner: shader.name, nodeColorSpace: shader.element["colorspace"] ?? document.colorSpace, in: documentScope)
+            var value = try builder.resolve(input: shader.input(field.source), definition: definition, owner: shader.name, nodeColorSpace: shader.element["colorspace"] ?? document.colorSpace, in: documentScope)
+            if let conversion = field.conversion {
+                value = try builder.call(conversion, [.context, value])
+            }
             surface = try builder.call("mx_surface_set_" + field.field, [surface, value])
         }
         if let translation = translationNames.last {

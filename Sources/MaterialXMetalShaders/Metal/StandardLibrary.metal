@@ -579,6 +579,42 @@ MX_MASKED(outside, in * (1.0 - mask))
 [[stitchable]] float4 mx_premult_color4(float4 in) { return float4(in.rgb * in.a, in.a); }
 [[stitchable]] float4 mx_unpremult_color4(float4 in) { return float4(in.rgb / in.a, in.a); }
 
+// MARK: Texture coordinates and normal maps (from MaterialX's GLSL)
+
+[[stitchable]] float2 mx_rotate2d_vector2(float2 in, float amount) {
+    float radians = amount * M_PI_F / 180.0;
+    float s = sin(radians), c = cos(radians);
+    return float2(c * in.x + s * in.y, -s * in.x + c * in.y);
+}
+
+[[stitchable]] float3 mx_rotate3d_vector3(float3 in, float amount, float3 axis) {
+    float radians = amount * M_PI_F / 180.0;
+    float3 a = normalize(axis);
+    float s = sin(radians), c = cos(radians), oc = 1.0 - c;
+    // MaterialX's mx_rotationMatrix, written row by row in a GLSL constructor, so these are its columns.
+    float3x3 m = float3x3(
+        float3(oc * a.x * a.x + c, oc * a.x * a.y - a.z * s, oc * a.z * a.x + a.y * s),
+        float3(oc * a.x * a.y + a.z * s, oc * a.y * a.y + c, oc * a.y * a.z - a.x * s),
+        float3(oc * a.z * a.x - a.y * s, oc * a.y * a.z + a.x * s, oc * a.z * a.z + c));
+    return m * in;
+}
+
+static float3 mx_normalmap(float3 value, float2 scale, float3 n, float3 t, float3 b) {
+    value = dot(value, value) == 0.0 ? float3(0, 0, 1) : value * 2.0 - 1.0;
+    return normalize(t * value.x * scale.x + b * value.y * scale.y + n * value.z);
+}
+[[stitchable]] float3 mx_normalmap_float(float3 in, float scale, float3 normal, float3 tangent, float3 bitangent) {
+    return mx_normalmap(in, float2(scale), normal, tangent, bitangent);
+}
+[[stitchable]] float3 mx_normalmap_vector2(float3 in, float2 scale, float3 normal, float3 tangent, float3 bitangent) {
+    return mx_normalmap(in, scale, normal, tangent, bitangent);
+}
+
+// A tangent-space normal (UsdPreviewSurface, RealityKit PBR) in world space, using the context's frame.
+[[stitchable]] float3 mx_tangent_to_world_vector3(MXContext context, float3 in) {
+    return normalize(context.tangentWorld * in.x + context.bitangentWorld * in.y + context.normalWorld * in.z);
+}
+
 // MARK: Ramps and splits (from MaterialX's mx_ramplr/ramptb/splitlr/splittb GLSL)
 // MaterialX's splits antialias with screen-space derivatives (mx_aastep), which stitched visible functions cannot
 // use; these switch with a hard step.

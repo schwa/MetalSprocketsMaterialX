@@ -1283,14 +1283,18 @@ transformpoint, transformvector and transformnormal (fromspace/tospace object, w
 ## 66: Texture coordinate and normal map nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, subtask, area:nodes, area:geometry
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:41:36Z
+closed: 2026-11-23T14:41:36Z
 +++
 
 rotate2d, rotate3d, place2d, normalmap and heighttonormal have no implementation, and tangent-space normal inputs (UsdPreviewSurface, realitykit_pbr_surfaceshader) are not mapped to MXSurfaceInputs. Acceptance: the nodes stitch and match MaterialX's GLSL; tangent-space normals map to a world normal. Part of #11.
+
+- `2026-11-23T14:41:36Z`: rotate2d and rotate3d (degrees, clockwise for positive amounts, as MaterialX's GLSL), normalmap (float and vector2 scale, from mx_normalmap.glsl); place2d now stitches through its nodegraph. Tangent-space shader normals map to world space through new mx_tangent_to_world_vector3 (SurfaceMapping.Field.conversion): UsdPreviewSurface normal, realitykit_pbr normal and clearcoatNormal. heighttonormal needs screen-space derivatives, which stitched functions cannot use: filed as #77. Tests: TexcoordAndNormalMapTests (failed before).
 
 ---
 
@@ -1438,5 +1442,19 @@ created: 2026-11-23T14:35:39Z
 +++
 
 Do a performance pass. Benchmark then autoresearch.
+
+---
+
+## 77: heighttonormal has no Metal implementation
+
++++
+status: open
+priority: low
+kind: feature
+labels: area:nodes, area:stitching, effort:m
+created: 2026-11-23T14:41:35Z
++++
+
+ND_heighttonormal_vector3 still fails with unsupportedNode. MaterialX's implementation (mx_heighttonormal_vector3.glsl) builds the normal from screen-space derivatives of the height and texture coordinate (dFdx/dFdy). Stitched visible functions have no access to screen-space derivatives, so the GLSL cannot be ported as is. Split out of #66.
 
 ---

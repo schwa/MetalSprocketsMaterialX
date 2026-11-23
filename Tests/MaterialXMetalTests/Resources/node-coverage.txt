@@ -4,6 +4,7 @@ ND_UsdPrimvarReader_integer nodeGraph
 ND_UsdPrimvarReader_vector2 nodeGraph
 ND_UsdPrimvarReader_vector3 nodeGraph
 ND_UsdPrimvarReader_vector4 nodeGraph
+ND_UsdTransform2d nodeGraph
 ND_UsdUVTexture nodeGraph
 ND_UsdUVTexture_23 nodeGraph
 ND_absval_color3 metal
@@ -231,6 +232,14 @@ ND_geompropvalue_vector2 metal
 ND_geompropvalue_vector3 metal
 ND_geompropvalue_vector4 metal
 ND_glossiness_anisotropy nodeGraph
+ND_gltf_anisotropy_image nodeGraph
+ND_gltf_colorimage nodeGraph
+ND_gltf_image_color3_color3_1_0 nodeGraph
+ND_gltf_image_color4_color4_1_0 nodeGraph
+ND_gltf_image_float_float_1_0 nodeGraph
+ND_gltf_image_vector3_vector3_1_0 nodeGraph
+ND_gltf_iridescence_thickness_float_1_0 nodeGraph
+ND_gltf_normalmap_vector3_1_0 nodeGraph
 ND_gooch_shade nodeGraph
 ND_grid_color3 nodeGraph
 ND_hexagon_float nodeGraph
@@ -416,6 +425,8 @@ ND_normal_vector3 metal
 ND_normalize_vector2 metal
 ND_normalize_vector3 metal
 ND_normalize_vector4 metal
+ND_normalmap_float metal
+ND_normalmap_vector2 metal
 ND_open_pbr_anisotropy nodeGraph
 ND_open_pbr_surface_to_standard_surface nodeGraph
 ND_out_color4 metal
@@ -426,6 +437,7 @@ ND_over_color4 metal
 ND_overlay_color3 nodeGraph
 ND_overlay_color4 nodeGraph
 ND_overlay_float nodeGraph
+ND_place2d_vector2 nodeGraph
 ND_plus_color3 metal
 ND_plus_color4 metal
 ND_plus_float metal
@@ -490,6 +502,8 @@ ND_remap_vector4 metal
 ND_remap_vector4FA metal
 ND_rgbtohsv_color3 metal
 ND_rgbtohsv_color4 metal
+ND_rotate2d_vector2 metal
+ND_rotate3d_vector3 metal
 ND_roughness_anisotropy metal
 ND_round_color3 metal
 ND_round_color4 metal
