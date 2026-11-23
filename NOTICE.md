@@ -12,8 +12,10 @@ Copyright Contributors to the MaterialX Project. Licensed under the Apache Licen
   `Scripts/update-materialx-libraries.sh`.
 - `Tests/MaterialXMetalTests/Resources/stdlib_genglsl_impl.mtlx`: MaterialX's GLSL implementation map, used as
   reference results. Modified: the unescaped `&&` in `IM_logical_and_genglsl` is written as `&amp;&amp;`.
-- `Sources/MaterialXMetal/Shaders/StandardLibrary.metal`: node implementations ported from MaterialX's `genglsl`
-  sources.
+- `Sources/MaterialXMetalShaders/Metal/StandardLibrary.metal`: node implementations ported from MaterialX's
+  `genglsl` sources.
+- `Tests/MaterialXMetalTests/Resources/Corpus/MaterialXExamples/`: the `.mtlx` files of MaterialX 1.39.4's
+  `resources/Materials/Examples`, unmodified, without their textures.
 
 ## Open Shading Language
 

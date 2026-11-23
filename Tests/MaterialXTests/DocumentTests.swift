@@ -141,6 +141,7 @@ struct DocumentTests {
         #expect(try Value("true", type: .boolean) == .boolean(true))
         #expect(try Value("true", type: .boolean).numbers == [1])
         #expect(try Value(" 3 ", type: .integer) == .integer(3))
+        #expect(try Value("1 1,1", type: .color3) == .numbers([1, 1, 1]))
         #expect(throws: MaterialXError.self) { try Value("1, 2", type: .color3) }
         #expect(throws: MaterialXError.self) { try Value("1.5", type: .integer) }
         #expect(throws: MaterialXError.self) { try Value("yes", type: .boolean) }

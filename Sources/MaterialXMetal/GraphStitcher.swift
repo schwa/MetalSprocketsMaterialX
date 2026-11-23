@@ -322,7 +322,7 @@ private struct Builder {
             if let node = interfaceNodes[key] {
                 return node
             }
-            guard let interface = scope.graph.input(interfaceName) else {
+            guard let interface = stitcher.standardLibrary.interfaceInput(interfaceName, of: scope.graph) else {
                 throw MaterialXError.invalidDocument("nodegraph '\(scope.graph.name)' has no input '\(interfaceName)'")
             }
             var node = try parameter(name: key, type: interface.type, value: converted(interface.value ?? definition.value, input: interface, definition: definition))

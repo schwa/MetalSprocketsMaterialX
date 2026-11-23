@@ -43,7 +43,7 @@ public extension Document {
                 }
                 if let interfaceName = input.interfaceName {
                     if let graph {
-                        if let interface = graph.input(interfaceName) {
+                        if let interface = library.interfaceInput(interfaceName, of: graph) {
                             if interface.type != input.type {
                                 issues.append(.init(path: path, message: "type \(input.type) does not match interface input '\(interfaceName)' of type \(interface.type)"))
                             }

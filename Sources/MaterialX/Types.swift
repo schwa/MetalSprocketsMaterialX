@@ -70,7 +70,9 @@ public enum Value: Hashable, Sendable {
             self = .string(string)
             return
         }
-        let parts = string.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        // Like MaterialX (ARRAY_VALID_SEPARATORS), components are separated by commas or spaces: its SimpleHair
+        // example writes "1 1,1".
+        let parts = string.split { $0 == "," || $0.isWhitespace }.map(String.init)
         let numbers = parts.compactMap(Float.init)
         guard numbers.count == parts.count, numbers.count == type.componentCount else {
             throw MaterialXError.invalidValue("'\(string)' as \(type)")

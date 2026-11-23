@@ -84,6 +84,11 @@ public struct StandardLibrary: Sendable {
         nodeDefsByCategory = Dictionary(grouping: self.nodeDefs.values, by: \.node)
     }
 
+    /// The interface input `name` of `graph`: its own `<input>`, or for a functional nodegraph, its nodedef's input.
+    public func interfaceInput(_ name: String, of graph: NodeGraph) -> Input? {
+        graph.input(name) ?? graph.nodeDefName.flatMap { nodeDefs[$0]?.input(name) }
+    }
+
     /// This library plus the custom nodedefs and nodegraph implementations declared in `documents`.
     public func merging(_ documents: [Document]) -> Self {
         Self(documents: self.documents + documents)
