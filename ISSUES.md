@@ -827,15 +827,18 @@ Tests parse the .mtlx files under Reality Composer Pro's ShaderGraph.framework a
 ## 49: System .mtlx tests are skipped silently when Reality Composer Pro is absent
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: effort:xs, area:testing
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:29:37Z
+closed: 2026-11-23T13:29:37Z
 +++
 
 SystemMaterialXFiles.urls returns an empty list on machines without RCP or the system frameworks, so systemFileParses runs zero cases and still passes. CI would not notice.
+
+- `2026-11-23T13:29:37Z`: systemFileParses is now .enabled(if: files exist) with a reason, so machines without RCP/system .mtlx files report it as skipped instead of passing with zero cases. The vendored corpus (#48) gives coverage that does not depend on installed apps. No failing-first test: absence of the files cannot be simulated without changing the machine.
 
 ---
 

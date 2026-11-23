@@ -162,8 +162,9 @@ struct DocumentTests {
         #expect(typeDef.members.map(\.type) == [.vector2, .integer])
     }
 
-    /// Every .mtlx file shipped with the system or Reality Composer Pro parses. Skipped when none are installed.
-    @Test(arguments: SystemMaterialXFiles.urls)
+    /// Every .mtlx file shipped with the system or Reality Composer Pro parses. Without any (CI, other machines) the
+    /// test is reported as skipped instead of passing with zero cases; the vendored corpus (#48) still runs there.
+    @Test(.enabled(if: !SystemMaterialXFiles.urls.isEmpty, "No system or Reality Composer Pro .mtlx files installed"), arguments: SystemMaterialXFiles.urls)
     func systemFileParses(url: URL) throws {
         let document = try Document(url: url)
         #expect(document.root.tag == "materialx")
