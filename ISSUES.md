@@ -762,15 +762,18 @@ This package must not depend on SceneSprockets (SceneSprockets will depend on it
 ## 44: No hot reload of .mtlx files
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:m, area:integration
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:34:53Z
+closed: 2026-11-23T13:34:53Z
 +++
 
 Editing a .mtlx file on disk does not update a running material. Re-stitching on change, and keeping parameter values when topology is unchanged, are not supported.
+
+- `2026-11-23T13:34:53Z`: DocumentWatcher(url:).events() yields .loaded(Document) now and after each change to the file or any xi:include'd file (polls modification dates, so atomic saves work), or .failed for unparseable saves. StitchedGraph.carryParameters(from:) copies run-time edits (values differing from initialParameterData) into a re-stitched graph by name and type; values changed in the file win. Re-stitching reuses cached libraries when topology is unchanged (#27). Tests: DocumentWatcherTests, CarryParametersTests.
 
 ---
 

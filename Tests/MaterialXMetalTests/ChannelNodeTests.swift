@@ -464,3 +464,20 @@ struct GraphDescriptionTests {
         #expect(description.contains("mx_output_vector3("))
     }
 }
+
+/// #44: parameter values survive re-stitching a reloaded document.
+@Suite(.serialized)
+struct CarryParametersTests {
+    @Test func editedValuesCarryOver() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        var old = try stitcher.stitch(try #require(Document(data: Data(StitchingTests.document.utf8)).nodeGraph("NG_test")), functionName: "materialx_graph")
+        try old.set("tint", to: SIMD3<Float>(0.1, 0.2, 0.3))
+        let changed = StitchingTests.document.replacingOccurrences(of: "<input name=\"mix\" type=\"float\" value=\"0.5\" />", with: "<input name=\"mix\" type=\"float\" value=\"0.25\" />")
+        var new = try stitcher.stitch(try #require(Document(data: Data(changed.utf8)).nodeGraph("NG_test")), functionName: "materialx_graph")
+        new.carryParameters(from: old)
+        #expect(new.parameterData[try #require(new.parameter("tint")).slot] == [0.1, 0.2, 0.3, 0])
+        // mix was edited in the file, not at run time, so the file's new value wins.
+        #expect(new.parameterData[try #require(new.parameter("blend.mix")).slot].x == 0.25)
+    }
+}

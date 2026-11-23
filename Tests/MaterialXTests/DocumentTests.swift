@@ -280,3 +280,29 @@ struct WriterTests {
         #expect(reparsed.root == root)
     }
 }
+
+/// #44: documents reload when their file (or an included file) changes.
+struct DocumentWatcherTests {
+    @Test func reloadsOnChangeIncludingIncludes() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let main = directory.appendingPathComponent("main.mtlx")
+        let included = directory.appendingPathComponent("defs.mtlx")
+        try Data("<materialx version=\"1.39\"><nodegraph name=\"a\" /></materialx>".utf8).write(to: included)
+        try Data("<materialx version=\"1.39\"><xi:include href=\"defs.mtlx\" /></materialx>".utf8).write(to: main)
+
+        var events = DocumentWatcher(url: main, interval: .milliseconds(20)).events().makeAsyncIterator()
+        guard case let .loaded(first) = await events.next() else { Issue.record("no first load"); return }
+        #expect(first.nodeGraphs.map(\.name) == ["a"])
+
+        try await Task.sleep(for: .milliseconds(50))
+        try Data("<materialx version=\"1.39\"><nodegraph name=\"b\" /></materialx>".utf8).write(to: included, options: .atomic)
+        guard case let .loaded(second) = await events.next() else { Issue.record("no reload"); return }
+        #expect(second.nodeGraphs.map(\.name) == ["b"])
+
+        try await Task.sleep(for: .milliseconds(50))
+        try Data("<materialx".utf8).write(to: main, options: .atomic)
+        guard case .failed = await events.next() else { Issue.record("expected a parse failure"); return }
+    }
+}

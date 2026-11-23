@@ -89,6 +89,8 @@ public struct StitchedGraph: @unchecked Sendable {
     public let outputType: ValueType
     public var parameters: [Parameter]
     public var parameterData: [SIMD4<Float>]
+    /// ``parameterData`` as stitched, before any changes.
+    public internal(set) var initialParameterData: [SIMD4<Float>] = []
     /// The stitching graph, one line per function node with its arguments and the MaterialX node it came from.
     public internal(set) var graphDescription = ""
 
@@ -105,6 +107,17 @@ public struct StitchedGraph: @unchecked Sendable {
         }
         let slots = Builder.slots(for: parameter.type, numbers: numbers)
         parameterData.replaceSubrange(parameter.slot..<(parameter.slot + parameter.slotCount), with: slots)
+    }
+
+    /// Copies the values `old`'s parameters were changed to at run time (different from what `old` was stitched
+    /// with) into parameters here with the same name and type. Values edited in the file win otherwise.
+    public mutating func carryParameters(from old: Self) {
+        for parameter in parameters {
+            guard let previous = old.parameter(parameter.name), previous.type == parameter.type, previous.slotCount == parameter.slotCount else { continue }
+            let range = previous.slot..<(previous.slot + previous.slotCount)
+            guard old.initialParameterData.indices.contains(range.upperBound - 1), old.parameterData[range] != old.initialParameterData[range] else { continue }
+            parameterData.replaceSubrange(parameter.slot..<(parameter.slot + parameter.slotCount), with: old.parameterData[range])
+        }
     }
 
     public mutating func set(_ name: String, to value: Float) throws {
@@ -187,6 +200,7 @@ public struct GraphStitcher {
         }
         var stitched = StitchedGraph(library: library, function: function, functionName: functionName, outputType: output.type, parameters: builder.parameters, parameterData: builder.parameterData)
         stitched.graphDescription = builder.graphDescription(functionName: functionName)
+        stitched.initialParameterData = stitched.parameterData
         return stitched
     }
 }
