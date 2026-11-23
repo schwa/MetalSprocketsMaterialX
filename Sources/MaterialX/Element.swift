@@ -32,6 +32,8 @@ public enum MaterialXError: Error, Equatable, CustomStringConvertible {
     case unsupportedNode(String)
     case invalidValue(String)
     case cycle(String)
+    /// Metal rejected the stitching graph. The message includes a dump of the graph.
+    case stitchingFailed(String)
 
     public var description: String {
         switch self {
@@ -41,6 +43,7 @@ public enum MaterialXError: Error, Equatable, CustomStringConvertible {
         case let .unsupportedNode(name): "Node has no Metal implementation: \(name)"
         case let .invalidValue(value): "Invalid value: \(value)"
         case let .cycle(node): "Nodegraph cycle at '\(node)'"
+        case let .stitchingFailed(message): "Function stitching failed: \(message)"
         }
     }
 }

@@ -501,15 +501,18 @@ Numbers are noisy (Metal's shader cache makes repeated graphs fast). Hand-writte
 ## 29: Stitching errors are hard to diagnose
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: effort:s, area:stitching
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:30:53Z
+closed: 2026-11-23T13:30:53Z
 +++
 
 When makeLibrary(stitchedDescriptor:) fails, the error names the stitching graph only. There is no way to dump the graph (nodes, argument wiring, types) for debugging.
+
+- `2026-11-23T13:30:53Z`: StitchedGraph.graphDescription dumps the stitching graph (one line per function node: n<i> = function(args) // MaterialX node). When Metal rejects a graph, the error is MaterialXError.stitchingFailed with Metal's message plus the dump. Test: descriptionNamesFunctionsAndNodes.
 
 ---
 

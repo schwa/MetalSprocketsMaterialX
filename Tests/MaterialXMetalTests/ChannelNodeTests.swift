@@ -448,3 +448,19 @@ struct ParameterSetterTests {
         #expect(throws: MaterialXError.self) { try stitched.set("tint", to: Value.numbers([1, 1])) }
     }
 }
+
+/// #29: the stitching graph can be dumped for debugging.
+@Suite(.serialized)
+struct GraphDescriptionTests {
+    @Test func descriptionNamesFunctionsAndNodes() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(StitchingTests.document.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
+        let description = stitched.graphDescription
+        #expect(description.hasPrefix("materialx_graph(arg0: texcoord, arg1: parameters):"))
+        #expect(description.contains("mx_multiply_color3FA(") && description.contains("// scaled"))
+        #expect(description.contains("mx_mix_color3(") && description.contains("// blend"))
+        #expect(description.contains("mx_output_vector3("))
+    }
+}

@@ -89,6 +89,8 @@ public struct StitchedGraph: @unchecked Sendable {
     public let outputType: ValueType
     public var parameters: [Parameter]
     public var parameterData: [SIMD4<Float>]
+    /// The stitching graph, one line per function node with its arguments and the MaterialX node it came from.
+    public internal(set) var graphDescription = ""
 
     public func parameter(_ name: String) -> Parameter? { parameters.first { $0.name == name } }
 
@@ -172,13 +174,20 @@ public struct GraphStitcher {
             let descriptor = MTLStitchedLibraryDescriptor()
             descriptor.functionGraphs = [stitchingGraph]
             descriptor.functions = Array(builder.functions.values)
-            let library = try nodeLibrary.device.makeLibrary(stitchedDescriptor: descriptor)
+            let library: MTLLibrary
+            do {
+                library = try nodeLibrary.device.makeLibrary(stitchedDescriptor: descriptor)
+            } catch {
+                throw MaterialXError.stitchingFailed("\(error.localizedDescription)\n\(builder.graphDescription(functionName: functionName))")
+            }
             guard let function = library.makeFunction(name: functionName) else {
-                throw MaterialXError.invalidDocument("stitched library is missing \(functionName)")
+                throw MaterialXError.stitchingFailed("stitched library is missing \(functionName)\n\(builder.graphDescription(functionName: functionName))")
             }
             return (library, function)
         }
-        return StitchedGraph(library: library, function: function, functionName: functionName, outputType: output.type, parameters: builder.parameters, parameterData: builder.parameterData)
+        var stitched = StitchedGraph(library: library, function: function, functionName: functionName, outputType: output.type, parameters: builder.parameters, parameterData: builder.parameterData)
+        stitched.graphDescription = builder.graphDescription(functionName: functionName)
+        return stitched
     }
 }
 
@@ -216,6 +225,16 @@ private struct Builder {
 
     /// One line per function node: its name and the wiring of its arguments. Identifies the stitched function.
     var topology: [String] = []
+    /// The MaterialX node (scoped key) each function node implements, by function node index.
+    var origins: [Int: String] = [:]
+
+    func graphDescription(functionName: String) -> String {
+        let lines = topology.enumerated().map { index, line in
+            "  n\(index) = \(line)" + (origins[index].map { "  // \($0)" } ?? "")
+        }
+        return "\(functionName)(arg0: texcoord, arg1: parameters):\n" + lines.joined(separator: "\n")
+    }
+
     var nodeIndices: [ObjectIdentifier: Int] = [:]
 
     func topologyName(_ node: MTLFunctionStitchingNode) -> String {
@@ -316,6 +335,9 @@ private struct Builder {
             } else {
                 throw MaterialXError.unsupportedNode(functionName)
             }
+        }
+        if let index = nodeIndices[ObjectIdentifier(stitchingNode)], origins[index] == nil {
+            origins[index] = key
         }
         resolved[key] = stitchingNode
         return stitchingNode
