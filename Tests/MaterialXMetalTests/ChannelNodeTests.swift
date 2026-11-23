@@ -749,3 +749,56 @@ struct DocumentLevelMultiOutputTests {
         #expect(try stitched.evaluate(at: [.zero]).first?.x == 0.2)
     }
 }
+
+/// #34: a surface shader compiles to one function filling MXSurfaceInputs.
+@Suite(.serialized)
+struct SurfaceStitchingTests {
+    static let source = """
+    <materialx version="1.39">
+      <nodegraph name="NG_rough">
+        <texcoord name="uv" type="vector2" />
+        <extract name="u" type="float"><input name="in" type="vector2" nodename="uv" /><input name="index" type="integer" value="0" /></extract>
+        <output name="out" type="float" nodename="u" />
+      </nodegraph>
+      <constant name="green" type="color3"><input name="value" type="color3" value="0, 1, 0" /></constant>
+      <gltf_pbr name="pbr" type="surfaceshader">
+        <input name="base_color" type="color3" nodename="green" />
+        <input name="metallic" type="float" value="0.25" />
+        <input name="roughness" type="float" nodegraph="NG_rough" output="out" />
+        <input name="emissive" type="color3" value="0.5, 0.5, 0" />
+      </gltf_pbr>
+      <surfacematerial name="M" type="material"><input name="surfaceshader" type="surfaceshader" nodename="pbr" /></surfacematerial>
+    </materialx>
+    """
+
+    @Test func gltfPbrFillsSurfaceInputs() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(Self.source.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let shader = try #require(document.nodes.first { $0.name == "pbr" })
+        var material = try stitcher.stitchSurface(shader, in: document, functionName: "materialx_surface")
+        #expect(material.parameter("pbr.metallic") != nil)
+
+        var context = MXShadingContext(texcoord: [0.75, 0])
+        context.normalWorld = [0, 1, 0]
+        let surface = try #require(try material.evaluateSurface(contexts: [context]).first)
+        #expect(surface.baseColor == [0, 1, 0])
+        #expect(surface.metallic == 0.25)
+        #expect(surface.roughness == 0.75)
+        #expect(surface.emissive == [0.5, 0.5, 0])
+        #expect(surface.normal == [0, 1, 0]) // defaultgeomprop Nworld
+        #expect(surface.occlusion == 1) // nodedef default
+        #expect(surface.ior == 1.5) // not a gltf_pbr input: keeps the initial value
+
+        try material.set("pbr.metallic", to: 1)
+        #expect(try material.evaluateSurface(contexts: [context]).first?.metallic == 1)
+    }
+
+    @Test func unmappedShaderThrows() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data("<materialx version=\"1.39\"><surface_unlit name=\"s\" type=\"surfaceshader\" /></materialx>".utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let shader = try #require(document.nodes.first)
+        #expect(throws: MaterialXError.self) { try stitcher.stitchSurface(shader, in: document, functionName: "f") }
+    }
+}

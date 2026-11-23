@@ -46,11 +46,27 @@ public extension StitchedGraph {
     /// are 0 and a missing fourth component is 1; booleans and integers become floats. Uses the current
     /// ``parameterData``. For debugging, tools and tests, not rendering.
     func evaluate(contexts: [MXShadingContext], textures: MTLBuffer? = nil, residentTextures: [MTLTexture] = [], device: MTLDevice? = nil) throws -> [SIMD4<Float>] {
+        let initial = [SIMD4<Float>](repeating: .zero, count: contexts.count)
+        return try run(kernel: "mx_evaluate_" + (try Self.evaluationSuffix(outputType)), contexts: contexts, initial: initial, textures: (textures, residentTextures), device: device)
+    }
+
+    /// Runs a surface function (``GraphStitcher/stitchSurface(_:in:functionName:mapping:)``) once per context,
+    /// starting each from `initial`.
+    func evaluateSurface(contexts: [MXShadingContext], initial: MXSurfaceInputs = .defaults, textures: MTLBuffer? = nil, residentTextures: [MTLTexture] = [], device: MTLDevice? = nil) throws -> [MXSurfaceInputs] {
+        guard outputType == .surfaceshader else {
+            throw MaterialXError.unsupportedNode("evaluateSurface on a graph with a \(outputType) output")
+        }
+        return try run(kernel: "mx_evaluate_surface", contexts: contexts, initial: [MXSurfaceInputs](repeating: initial, count: contexts.count), textures: (textures, residentTextures), device: device)
+    }
+
+    /// Dispatches `kernel` (one of the `mx_evaluate_*` kernels) with this graph in its function table. `initial` is
+    /// the output buffer's starting contents, one element per context.
+    private func run<Output>(kernel kernelName: String, contexts: [MXShadingContext], initial: [Output], textures: (table: MTLBuffer?, resident: [MTLTexture]), device: MTLDevice?) throws -> [Output] {
         guard !contexts.isEmpty else { return [] }
         let device = device ?? library.device
         let shaders = try device.makeDefaultLibrary(bundle: .materialXMetalShaders())
-        guard let kernel = shaders.makeFunction(name: "mx_evaluate_" + (try Self.evaluationSuffix(outputType))) else {
-            throw MaterialXError.unsupportedNode("evaluating an output of type \(outputType)")
+        guard let kernel = shaders.makeFunction(name: kernelName) else {
+            throw MaterialXError.unsupportedNode("evaluation kernel \(kernelName)")
         }
         let functionDescriptor = MTLFunctionDescriptor()
         functionDescriptor.name = functionName
@@ -71,7 +87,7 @@ public extension StitchedGraph {
               let handle = pipeline.functionHandle(function: binary),
               let input = device.makeBuffer(bytes: contexts, length: MemoryLayout<MXShadingContext>.stride * contexts.count),
               let parameterBuffer = device.makeBuffer(bytes: parameters, length: MemoryLayout<SIMD4<Float>>.stride * parameters.count),
-              let output = device.makeBuffer(length: MemoryLayout<SIMD4<Float>>.stride * contexts.count),
+              let output = device.makeBuffer(bytes: initial, length: MemoryLayout<Output>.stride * contexts.count),
               let queue = device.makeCommandQueue(),
               let commandBuffer = queue.makeCommandBuffer(),
               let encoder = commandBuffer.makeComputeCommandEncoder()
@@ -84,9 +100,9 @@ public extension StitchedGraph {
         encoder.setBuffer(parameterBuffer, offset: 0, index: 1)
         encoder.setBuffer(output, offset: 0, index: 2)
         encoder.setVisibleFunctionTable(table, bufferIndex: 3)
-        let textureTable = try textures ?? Self.makeTextureTable([], device: device)
+        let textureTable = try textures.table ?? Self.makeTextureTable([], device: device)
         encoder.setBuffer(textureTable, offset: 0, index: 4)
-        for texture in residentTextures {
+        for texture in textures.resident {
             encoder.useResource(texture, usage: .read)
         }
         let width = min(contexts.count, pipeline.maxTotalThreadsPerThreadgroup)
@@ -97,7 +113,7 @@ public extension StitchedGraph {
         if let error = commandBuffer.error {
             throw error
         }
-        let pointer = output.contents().bindMemory(to: SIMD4<Float>.self, capacity: contexts.count)
+        let pointer = output.contents().bindMemory(to: Output.self, capacity: contexts.count)
         return Array(UnsafeBufferPointer(start: pointer, count: contexts.count))
     }
 

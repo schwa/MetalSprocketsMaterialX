@@ -58,6 +58,46 @@ MX_IMAGE(color3, float3, sample.rgb)
 MX_IMAGE(vector4, float4, sample)
 MX_IMAGE(color4, float4, sample)
 
+// MARK: Surface inputs
+// A surface function sets each MXSurfaceInputs field with one setter. Setters return the pointer so the next setter
+// depends on it, which orders them and keeps them in the stitched graph. The last call takes every argument so the
+// signature stays `void (context, parameters, textures, surface)`.
+
+typedef thread MXSurfaceInputs *MXSurface;
+
+#define MX_SURFACE_SET(FIELD, T) \
+    [[stitchable]] MXSurface mx_surface_set_##FIELD(MXSurface surface, T value) { surface->FIELD = value; return surface; }
+MX_SURFACE_SET(baseColor, float3)
+MX_SURFACE_SET(emissive, float3)
+MX_SURFACE_SET(specularColor, float3)
+MX_SURFACE_SET(sheenColor, float3)
+MX_SURFACE_SET(normal, float3)
+MX_SURFACE_SET(clearcoatNormal, float3)
+MX_SURFACE_SET(opacity, float)
+MX_SURFACE_SET(metallic, float)
+MX_SURFACE_SET(roughness, float)
+MX_SURFACE_SET(occlusion, float)
+MX_SURFACE_SET(specular, float)
+MX_SURFACE_SET(ior, float)
+MX_SURFACE_SET(transmission, float)
+MX_SURFACE_SET(clearcoat, float)
+MX_SURFACE_SET(clearcoatRoughness, float)
+MX_SURFACE_SET(sheenRoughness, float)
+MX_SURFACE_SET(iridescence, float)
+MX_SURFACE_SET(iridescenceThickness, float)
+
+[[stitchable]] void mx_surface_output(MXSurface, MXContext, constant float4 *, MXTextures) {}
+
+kernel void mx_evaluate_surface(device const MXShadingContext *contexts [[buffer(0)]], constant float4 *parameters [[buffer(1)]],
+                                device MXSurfaceInputs *out [[buffer(2)]],
+                                visible_function_table<void(MXContext, constant float4 *, MXTextures, MXSurface)> material [[buffer(3)]],
+                                MXTextures textures [[buffer(4)]], uint id [[thread_position_in_grid]]) {
+    MXShadingContext context = contexts[id];
+    MXSurfaceInputs surface = out[id];
+    material[0](context, parameters, textures, &surface);
+    out[id] = surface;
+}
+
 // MARK: Evaluation
 // Kernels that call a stitched graph through a visible function table, one result per context. Used by
 // StitchedGraph.evaluate for tools and tests.

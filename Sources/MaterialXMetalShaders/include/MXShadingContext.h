@@ -44,6 +44,35 @@ typedef struct MXShadingContext {
     float frame;
 } MXShadingContext;
 
+// What a surface shader (gltf_pbr, UsdPreviewSurface, …) resolves to at a surface point: the inputs a metallic-
+// roughness PBR shader needs, named after glTF's. Filled by a stitched surface function
+//
+//     void material(thread const MXShadingContext &context, constant float4 *parameters, constant MXTexture *textures,
+//                   thread MXSurfaceInputs *surface)
+//
+// Inputs a shader does not have keep the values the caller put in `surface` (see MXSurfaceInputs defaults in Swift).
+typedef struct MXSurfaceInputs {
+    MXFloat3 baseColor;
+    MXFloat3 emissive;
+    MXFloat3 specularColor;
+    MXFloat3 sheenColor;
+    /// World space; the shading context's normal unless the material sets one.
+    MXFloat3 normal;
+    MXFloat3 clearcoatNormal;
+    float opacity;
+    float metallic;
+    float roughness;
+    float occlusion;
+    float specular;
+    float ior;
+    float transmission;
+    float clearcoat;
+    float clearcoatRoughness;
+    float sheenRoughness;
+    float iridescence;
+    float iridescenceThickness;
+} MXSurfaceInputs;
+
 // Per-draw values for the unlit MaterialX pipeline (MaterialXUnlitSurface).
 typedef struct MXUnlitUniforms {
     MXFloat4x4 modelViewProjection;

@@ -83,6 +83,8 @@ public struct StitchedGraph: @unchecked Sendable {
         case context = 0
         case parameters = 1
         case textures = 2
+        /// Surface functions only: the `MXSurfaceInputs` they fill.
+        case surface = 3
     }
 
     public let library: MTLLibrary
@@ -218,6 +220,8 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
         case parameters
         /// Argument 2 of the stitched function: the `MXTexture` table.
         case textures
+        /// Argument 3 of a surface function: the `MXSurfaceInputs` pointer.
+        case surface
         /// The result of `calls[index]`.
         case call(Int)
     }
@@ -251,7 +255,8 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
         let lines = calls.enumerated().map { index, call in
             "  n\(index) = \(Self.line(call))" + (call.origin.map { "  // \($0)" } ?? "")
         }
-        return "\(functionName)(arg0: context, arg1: parameters, arg2: textures):\n" + lines.joined(separator: "\n")
+        let surface = outputType == .surfaceshader ? ", arg3: surface" : ""
+        return "\(functionName)(arg0: context, arg1: parameters, arg2: textures\(surface)):\n" + lines.joined(separator: "\n")
     }
 
     static func line(_ call: Call) -> String {
@@ -260,6 +265,7 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
             case .context: "arg0"
             case .parameters: "arg1"
             case .textures: "arg2"
+            case .surface: "arg3"
             case let .call(index): "n\(index)"
             }
         }
@@ -273,6 +279,7 @@ extension MetalNodeLibrary {
             GraphPlan.Operand.context: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.context.rawValue),
             .parameters: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.parameters.rawValue),
             .textures: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.textures.rawValue),
+            .surface: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.surface.rawValue),
         ]
         var nodes: [MTLFunctionStitchingFunctionNode] = []
         var functions: [String: MTLFunction] = [:]
@@ -305,7 +312,7 @@ extension MetalNodeLibrary {
     }
 }
 
-private struct Builder {
+struct Builder {
     /// A graph being expanded. Functional nodegraphs are inlined in their own scope, with interface inputs bound to
     /// the calling node's arguments.
     struct Scope {
@@ -634,7 +641,7 @@ private struct Builder {
     }
 }
 
-private extension ValueType {
+extension ValueType {
     /// Whether values of this type can be passed between stitched functions.
     var isStitchable: Bool {
         (try? metalSuffix()) != nil

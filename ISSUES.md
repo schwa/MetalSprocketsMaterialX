@@ -614,19 +614,21 @@ The library compiles pattern graphs only. Surface shader nodes and their BSDF/ED
 ## 34: No mapping from MaterialX surface shaders to MetalSprocketsPBR material inputs
 
 +++
-status: open
+status: closed
 priority: critical
 kind: feature
 labels: effort:l, area:pbr, area:integration
 depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:56:27Z
+updated: 2026-11-23T13:58:50Z
+closed: 2026-11-23T13:58:50Z
 +++
 
 MetalSprocketsPBR (in SceneSprockets) shades with PBRMaterialUniforms and fixed texture slots. There is no defined way for a stitched MaterialX graph to supply base color, metallic, roughness, normal, emissive, occlusion, transmission, clearcoat, sheen, specular, iridescence, anisotropy etc. to that shader per pixel.
 
 - `2026-11-23T12:56:27Z`: Question 1 (design): Compile each connected surface-shader input (base_color, metalness, specular_roughness, normal, emission, coat, ...) into one stitched function that fills a shared MXSurfaceInputs struct matching PBRMaterialUniforms fields? Recommended: Yes, one function writing a struct
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T13:58:50Z`: Per #34-Q1: GraphStitcher.planSurface/stitchSurface(shader, in: document, functionName:) compiles every mapped input of a surface shader into ONE stitched function, void material(context, parameters, textures, thread MXSurfaceInputs *surface), built from mx_surface_set_<field> setters chained through the surface pointer. MXSurfaceInputs (shared header) has glTF metallic-roughness fields matching PBRMaterialUniforms (baseColor, emissive, specular/specularColor, sheen, normal, clearcoat/clearcoatRoughness/clearcoatNormal, opacity, metallic, roughness, occlusion, ior, transmission, iridescence/thickness); MXSurfaceInputs.defaults are glTF's. SurfaceMapping.builtIn covers gltf_pbr and UsdPreviewSurface (its tangent-space normal is not mapped yet); standard_surface/open_pbr_surface go through translation graphs (#36). Connected inputs are stitched from their nodegraph or document-level nodes; unconnected ones are editable parameters '<shader>.<input>'; defaultgeomprop inputs (normal: Nworld) read the context. StitchedGraph.evaluateSurface(contexts:) runs it. The PBR renderer hook is #35 (SceneSprockets). Tests: SurfaceStitchingTests.
 
 ---
 
