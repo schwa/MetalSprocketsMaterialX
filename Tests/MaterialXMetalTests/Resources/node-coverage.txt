@@ -131,10 +131,14 @@ ND_cos_float metal
 ND_cos_vector2 metal
 ND_cos_vector3 metal
 ND_cos_vector4 metal
+ND_crosshatch_color3 nodeGraph
 ND_difference_color3 metal
 ND_difference_color4 metal
 ND_difference_float metal
 ND_disjointover_color4 metal
+ND_distance_vector2 nodeGraph
+ND_distance_vector3 nodeGraph
+ND_distance_vector4 nodeGraph
 ND_divide_color3 metal
 ND_divide_color3FA metal
 ND_divide_color4 metal
@@ -201,6 +205,7 @@ ND_geompropvalue_integer metal
 ND_geompropvalue_vector2 metal
 ND_geompropvalue_vector3 metal
 ND_geompropvalue_vector4 metal
+ND_gooch_shade nodeGraph
 ND_grid_color3 nodeGraph
 ND_hexagon_float nodeGraph
 ND_hsvadjust_color3 nodeGraph
@@ -277,6 +282,7 @@ ND_lin_adobergb_to_lin_rec709_color3 nodeGraph
 ND_lin_adobergb_to_lin_rec709_color4 nodeGraph
 ND_lin_displayp3_to_lin_rec709_color3 nodeGraph
 ND_lin_displayp3_to_lin_rec709_color4 nodeGraph
+ND_line_float nodeGraph
 ND_ln_float metal
 ND_ln_vector2 metal
 ND_ln_vector3 metal
@@ -287,6 +293,9 @@ ND_logical_or metal
 ND_logical_xor nodeGraph
 ND_luminance_color3 metal
 ND_luminance_color4 metal
+ND_magnitude_vector2 metal
+ND_magnitude_vector3 metal
+ND_magnitude_vector4 metal
 ND_mask_color4 metal
 ND_matte_color4 metal
 ND_max_color3 metal
@@ -348,6 +357,9 @@ ND_multiply_vector3FA metal
 ND_multiply_vector4 metal
 ND_multiply_vector4FA metal
 ND_normal_vector3 metal
+ND_normalize_vector2 metal
+ND_normalize_vector3 metal
+ND_normalize_vector4 metal
 ND_open_pbr_surface_to_standard_surface nodeGraph
 ND_out_color4 metal
 ND_outside_color3 metal
@@ -512,5 +524,11 @@ ND_transformmatrix_vector3 metal
 ND_transformmatrix_vector3M4 metal
 ND_transformmatrix_vector4 metal
 ND_trianglewave_float nodeGraph
+ND_triplanarprojection_color3 nodeGraph
+ND_triplanarprojection_color4 nodeGraph
+ND_triplanarprojection_float nodeGraph
+ND_triplanarprojection_vector2 nodeGraph
+ND_triplanarprojection_vector3 nodeGraph
+ND_triplanarprojection_vector4 nodeGraph
 ND_unpremult_color4 metal
 ND_viewdirection_vector3 metal

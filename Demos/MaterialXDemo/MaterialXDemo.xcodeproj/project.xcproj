@@ -1,0 +1,82 @@
+{
+  "default-configuration": "Release",
+  "configurations": [
+    { "name": "Debug", "file": { "anchor": "Configuration", "relative-path": "Project-Debug.xcconfig" } },
+    { "name": "Release", "file": { "anchor": "Configuration", "relative-path": "Project-Release.xcconfig" } },
+  ],
+  "localizations": {
+    "development": "en",
+    "supported": [
+      "Base",
+    ],
+  },
+  "files": [
+    {
+      "kind": "folder",
+      "path": "Configuration",
+      "target-membership": [
+        "MaterialXDemo",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "MaterialXDemo",
+          "exclusions": [
+            "Project-Debug.xcconfig",
+            "Project-Release.xcconfig",
+            "Project-Shared.xcconfig",
+            "MaterialXDemo-Debug.xcconfig",
+            "MaterialXDemo-Release.xcconfig",
+            "MaterialXDemo-Shared.xcconfig",
+          ],
+        },
+      ],
+    }, {
+      "kind": "folder",
+      "path": "Packages",
+      "target-membership": [
+        "MaterialXDemo",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "MaterialXDemo",
+          "exclusions": [
+            "MaterialXDemoSupport",
+          ],
+        },
+      ],
+    },
+    { "kind": "folder", "path": "MaterialXDemo", "target-membership": [ "MaterialXDemo" ] },
+    {
+      "kind": "group",
+      "name": "Products",
+      "children": [
+        { "path": "<PRODUCTS>/.app", "id": "451594472F64A8DC005F944D", "type": "wrapper.application", "index": false },
+      ],
+    },
+  ],
+  "targets": [
+    {
+      "name": "MaterialXDemo",
+      "id": "451594462F64A8DC005F944D",
+      "product": "Products/.app",
+      "product-type": "application",
+      "specialized-configurations": [
+        { "name": "Debug", "file": { "anchor": "Configuration", "relative-path": "MaterialXDemo-Debug.xcconfig" } },
+        { "name": "Release", "file": { "anchor": "Configuration", "relative-path": "MaterialXDemo-Release.xcconfig" } },
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "package-product-members": [
+        {
+          "product-name": "MaterialXDemoSupport",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+    },
+  ],
+  "last-upgrade": "26.4",
+  "last-swift-update": "26.4",
+}

@@ -1010,19 +1010,21 @@ README is a stub. There is no usage example, architecture description (MaterialX
 ## 54: No demo app or example
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:m, area:docs
 depends: 41
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:35:00Z
+updated: 2026-11-23T14:15:50Z
+closed: 2026-11-23T14:15:50Z
 +++
 
 There is no example that loads a .mtlx file and renders it on a mesh with MetalSprockets, nor a DemoKit / MetalSprocketsExamples entry.
 
 - `2026-11-23T13:35:00Z`: Question 1 (decision): Build the demo (a macOS app via 'xcb new' that loads a .mtlx with DocumentWatcher and shows each stitched output on a quad, plus the mtlx stitch report) after #41 provides the render element, rather than writing ad-hoc render code in the demo now? Recommended: Yes, after #41
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:15:50Z`: Per #54-Q1: Demos/MaterialXDemo, made with 'xcb new MaterialXDemo --template multiplatform-app-extended'. MaterialXDemoSupport (local package, depends on this repo by path) loads a .mtlx (bundled Sample.mtlx: checker, rainbow, rings), watches it with DocumentWatcher, stitches every color output of each nodegraph, and draws each on a quad with MaterialXUnlitSurface in a RenderView, with the stitch report (parameters or error) underneath; run-time parameter edits carry over reloads. Open… picks another file. Built and run on macOS; screenshot in the demo README. Test: sampleDocumentStitchesEveryOutput. Also added magnitude and normalize (rings uses magnitude); Demos is excluded from the root SwiftLint config and has its own (template config fixed for this SwiftLint).
 
 ---
 

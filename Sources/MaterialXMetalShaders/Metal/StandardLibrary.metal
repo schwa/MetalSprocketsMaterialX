@@ -243,6 +243,13 @@ MX_UNARY(dot, in)
     return float2(roughnessSquared);
 }
 
+[[stitchable]] float mx_magnitude_vector2(float2 in) { return length(in); }
+[[stitchable]] float mx_magnitude_vector3(float3 in) { return length(in); }
+[[stitchable]] float mx_magnitude_vector4(float4 in) { return length(in); }
+[[stitchable]] float2 mx_normalize_vector2(float2 in) { return normalize(in); }
+[[stitchable]] float3 mx_normalize_vector3(float3 in) { return normalize(in); }
+[[stitchable]] float4 mx_normalize_vector4(float4 in) { return normalize(in); }
+
 [[stitchable]] float mx_dotproduct_vector2(float2 in1, float2 in2) { return dot(in1, in2); }
 [[stitchable]] float mx_dotproduct_vector3(float3 in1, float3 in2) { return dot(in1, in2); }
 [[stitchable]] float mx_dotproduct_vector4(float4 in1, float4 in2) { return dot(in1, in2); }

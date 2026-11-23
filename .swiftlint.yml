@@ -6,6 +6,7 @@ excluded:
   - "**/.swiftpm"
   - "**/DerivedData"
   - "**/Package.swift"
+  - Demos # The demo app has its own config.
 
 # MaterialX XML in test string literals uses 2-space indentation.
 indentation_width:
