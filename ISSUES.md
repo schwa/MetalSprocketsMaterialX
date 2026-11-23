@@ -529,6 +529,8 @@ updated: 2026-11-23T12:55:47Z
 
 Subgraphs that depend only on constants are stitched as function calls and evaluated per pixel. SceneSprocketsMaterialX already folds math on constants on the CPU (#609 in SceneSprockets).
 
+- `2026-11-23T13:31:01Z`: Question 1 (design): Add an opt-in GraphStitcher.foldConstants that stitches each constant-only subgraph separately, evaluates it once on the GPU with a 1-thread compute dispatch, and replaces it with one parameter slot (so no CPU copy of node semantics is needed), accepting that folded inputs are no longer editable by their original parameter names? Recommended: Yes, opt-in, GPU-evaluated
+
 ---
 
 ## 31: Node library is compiled by SwiftPM's default .metal processing
@@ -946,5 +948,24 @@ updated: 2026-11-23T12:55:47Z
 +++
 
 There is no command-line tool to list a document's materials and graphs, report unsupported nodes, or dump the stitched function and parameter layout.
+
+---
+
+## 56: No node editor for MaterialX graphs
+
++++
+status: new
+priority: medium
+kind: feature
+labels: area:tooling,area:integration
+created: 2026-11-23T13:31:07Z
++++
+
+There is no visual editor for MaterialX documents. Users cannot see a nodegraph as nodes and wires, add or connect nodes from the bundled libraries, edit input values, or preview the result live.
+
+Related:
+- MetalSprocketsShaderGraph already has a node editor built on function stitching (see #45).
+- Documents cannot be written back to .mtlx yet (#8), so edits could not be saved.
+- Live preview needs a render element (#41).
 
 ---
