@@ -53,6 +53,37 @@ struct DocumentTests {
         #expect(library.nodeDef(for: try node(["version": "9.9"])) == nil)
     }
 
+    /// #6: tokens, fileprefix inheritance and UDIM patterns.
+    @Test func filenamesResolveTokensAndPrefixes() throws {
+        let source = """
+        <materialx version="1.39" fileprefix="root/">
+          <nodegraph name="g" fileprefix="textures/">
+            <token name="asset" type="string" value="wood" />
+            <image name="a" type="color3"><input name="file" type="filename" value="[asset]_albedo.&lt;UDIM&gt;.png" /></image>
+            <image name="b" type="color3" fileprefix="override/">
+              <token name="asset" type="string" value="metal" />
+              <input name="file" type="filename" value="[asset].png" />
+            </image>
+          </nodegraph>
+          <image name="c" type="color3"><input name="file" type="filename" value="top.png" /></image>
+        </materialx>
+        """
+        let document = try Document(data: Data(source.utf8))
+        let graph = try #require(document.nodeGraph("g"))
+        func resolve(_ name: String, in graph: NodeGraph?) throws -> String? {
+            let node = try #require(graph?.nodes[name] ?? document.nodes.first { $0.name == name })
+            return document.resolvedFilename(try #require(node.input("file")), node: node, graph: graph)
+        }
+        let tiled = try #require(try resolve("a", in: graph))
+        #expect(tiled == "textures/wood_albedo.<UDIM>.png")
+        #expect(try resolve("b", in: graph) == "override/metal.png")
+        #expect(try resolve("c", in: nil) == "root/top.png")
+        let pattern = FilenamePattern(tiled)
+        #expect(pattern.isTiled)
+        #expect(pattern.filename(u: 1, v: 2) == "textures/wood_albedo.1022.png")
+        #expect(FilenamePattern("t.<UVTILE>.png").filename(u: 0, v: 0) == "t.u1_v1.png")
+    }
+
     @Test func nodeDefMatchesFloatArgumentVariant() throws {
         let node = try Node(Element(tag: "multiply", attributes: ["name": "m", "type": "color3"], children: [
             Element(tag: "input", attributes: ["name": "in1", "type": "color3", "value": "1, 1, 1"]),

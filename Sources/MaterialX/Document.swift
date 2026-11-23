@@ -126,6 +126,7 @@ public struct NodeGraph: Hashable, Sendable {
     public var inputs: [Input]
     public var outputs: [Output]
     public var nodes: [String: Node]
+    public var element: Element
 
     static let nonNodeTags: Set<String> = ["input", "output", "token", "backdrop", "comment"]
 
@@ -133,6 +134,7 @@ public struct NodeGraph: Hashable, Sendable {
         guard let name = element.name else {
             throw MaterialXError.invalidDocument("<nodegraph> without name")
         }
+        self.element = element
         self.name = name
         nodeDefName = element["nodedef"]
         inputs = try element.children(tag: "input").map(Input.init)

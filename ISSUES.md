@@ -94,15 +94,18 @@ colorspace on the document, nodegraph, image and input values, and unit / unitty
 ## 6: Tokens and string substitution in filenames are not resolved
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:m, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:08:21Z
+closed: 2026-11-23T13:08:21Z
 +++
 
 <token> elements and [token] substitution in filename values (e.g. textures/[albedo].png), the fileprefix attribute inherited from ancestors, and UDIM <UDIM> / <UVTILE> patterns are not resolved.
+
+- `2026-11-23T13:08:21Z`: Document.resolvedFilename(_:node:graph:) applies [token] substitution (node tokens override graph/root) and the nearest fileprefix (input > node > graph > root). FilenamePattern expands <UDIM> / <UVTILE> per tile. Interface-driven tokens (token values connected to nodedef inputs) are not handled. Test: filenamesResolveTokensAndPrefixes.
 
 ---
 
