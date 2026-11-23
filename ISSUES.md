@@ -795,18 +795,20 @@ SceneSprockets has SceneSprocketsMaterialX (MaterialXDocument, its own XML parse
 ## 43: SceneSprockets cannot depend on this package without a dependency cycle check
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:s, area:scenesprockets, area:build
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:09:07Z
+closed: 2026-11-23T14:09:07Z
 +++
 
 This package must not depend on SceneSprockets (SceneSprockets will depend on it), yet the PBR renderer it targets lives in SceneSprockets' MetalSprocketsPBR target. Where the PBR bridge code lives is undecided.
 
 - `2026-11-23T13:16:20Z`: Question 1 (decision): Put the MaterialX→PBR bridge in SceneSprockets (e.g. extend SceneSprocketsMaterialX to depend on this package), keeping MetalSprocketsMaterialX free of any SceneSprockets dependency? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:09:07Z`: Per #43-Q1: the MaterialX → PBR bridge lives in SceneSprockets (SceneSprocketsMaterialX, #42/#35); this package depends only on MetalSprockets and MetalCompilerPlugin. README section 'Dependencies and SceneSprockets' states the rule; DependencyRuleTests fails if Package.swift ever mentions SceneSprockets.
 
 ---
 

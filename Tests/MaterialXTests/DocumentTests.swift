@@ -354,3 +354,12 @@ struct DocumentEditingTests {
         #expect(ContinuousClock.now - start < .milliseconds(200))
     }
 }
+
+/// #43: this package must not depend on SceneSprockets (SceneSprockets depends on it).
+struct DependencyRuleTests {
+    @Test func packageDoesNotDependOnSceneSprockets() throws {
+        let manifest = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../Package.swift")
+        let text = try String(contentsOf: manifest, encoding: .utf8)
+        #expect(!text.contains("SceneSprockets"))
+    }
+}

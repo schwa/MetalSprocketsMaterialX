@@ -78,6 +78,12 @@ let function = try graph.visibleFunction() // a MetalSprockets VisibleFunction
 `GraphStitcher.coverage()` reports how each nodedef is implemented. `Tests/MaterialXMetalTests/Resources/node-coverage.txt`
 is the checked-in baseline.
 
+## Dependencies and SceneSprockets
+
+This package depends on MetalSprockets and MetalCompilerPlugin only. It must never depend on SceneSprockets:
+SceneSprockets depends on this package, and the bridge from `MXSurfaceInputs` to the PBR renderer
+(`PBRMaterialUniforms`, the fragment shader hook) lives in SceneSprockets' `SceneSprocketsMaterialX` target.
+
 ## Development
 
 ```sh
