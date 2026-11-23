@@ -389,6 +389,7 @@ updated: 2026-11-23T12:55:47Z
 The stitched function is T(float2 texcoord, constant float4 *parameters). There is no way to pass position, normal, tangent, view direction, time, vertex color, or multiple UV sets. Changing it later breaks every caller, so the shading context needs to be designed before more nodes are added.
 
 - `2026-11-23T12:56:14Z`: Question 1 (design): Should the stitched function become T graph(thread const MXShadingContext &context, constant float4 *parameters), with MXShadingContext (world/object position and normal, tangent, bitangent, view direction, texcoord[2], vertex color, time, frame) in a shared header? Recommended: Yes
+- `2026-11-23T13:38:12Z`: Related: #61 (evaluation kernels hard-code the current signature).
 
 ---
 
@@ -424,6 +425,7 @@ updated: 2026-11-23T12:55:47Z
 Every parameter takes one float4 slot, including floats. parameterData is [SIMD4<Float>] indexed by slot number; there is no typed setter by name (e.g. set("tint", to: SIMD3)) and no validation of type on write.
 
 - `2026-11-23T13:30:08Z`: Question 1 (decision): Leave the one-float4-slot-per-parameter layout as is (simple readers, 16 B per scalar; a 50-input material is under 1 KB) and close #24 with the typed setters, instead of packing scalars into shared slots? Recommended: Yes, keep the layout
+- `2026-11-23T13:38:12Z`: Related: #59 (layout is spread over four places).
 
 ---
 
@@ -560,15 +562,18 @@ StandardLibrary.metal is a .process resource compiled into the target bundle's d
 ## 32: Unused stitching graph arguments change the stitched signature
 
 +++
-status: open
+status: closed
 priority: low
 kind: documentation
 labels: effort:xs, area:stitching
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:35:38Z
+closed: 2026-11-23T13:35:38Z
 +++
 
 Found during bootstrap: MTLFunctionStitchingGraph drops input arguments that no node reads, so a graph that ignores texcoord compiled as T(constant float4 *) and the caller read garbage. The mx_output_* sink nodes work around it. This is not documented in the README, and there is no test for a graph that reads neither argument.
+
+- `2026-11-23T13:35:38Z`: Documented in README (How stitching works) and at mx_output_* in StandardLibrary.metal (#53). Covered by tests: texcoordOnlyGraph (parameters argument unused) and the constant-only graphs, e.g. ShaderInputStitchingTests and ConditionalNodeTests (texcoord unused). A graph reading neither argument cannot be built: every constant becomes a parameter read, so a parameters read is always present unless the graph has no inputs at all, and then the output sink still takes both arguments.
 
 ---
 
@@ -648,11 +653,14 @@ status: open
 priority: medium
 kind: feature
 labels: effort:l, area:pbr, area:lighting
+depends: 22, 33
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:38:54Z
 +++
 
 MaterialX surface shaders need light loops and IBL. MetalSprocketsLighting provides lights, shadows and environment for every renderer, but nothing connects it to MaterialX shading.
+
+- `2026-11-23T13:38:54Z`: Question 1 (design): Should MaterialX surface shading reuse the lighting loop and IBL already in MetalSprocketsLighting/MetalSprocketsPBR (lit by the PBR renderer once #35 hooks stitched inputs in), instead of this package evaluating lights itself? Recommended: Yes, reuse the PBR renderer's lighting
 
 ---
 
@@ -663,11 +671,14 @@ status: open
 priority: low
 kind: feature
 labels: effort:l, area:shading
+depends: 22, 33
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:35:07Z
 +++
 
 displacementshader, volumeshader and the displacement input on surfacematerial are ignored.
+
+- `2026-11-23T13:35:07Z`: Question 1 (decision): Defer displacement and volume shaders until #22 (normal/position in the shading context) and #33 (shader closures) exist, since displacement needs a vertex-stage hook and volumes need closures? Recommended: Yes
 
 ---
 
@@ -790,6 +801,8 @@ updated: 2026-11-23T12:55:47Z
 
 MetalSprocketsShaderGraph (node editor, own ShaderGraph.swift using function stitching) and MetalSprocketsAddOns' SimpleStitchedFunctionGraph overlap with this package. Whether ShaderGraph can load/save MaterialX or share the node library is not decided.
 
+- `2026-11-23T13:35:24Z`: Question 1 (decision): Make MetalSprocketsShaderGraph use this package as its document format and node library (load/save .mtlx, node palette from StandardLibrary, compile with GraphStitcher), retire SimpleStitchedFunctionGraph in MetalSprocketsAddOns in favor of GraphStitcher, and build the MaterialX node editor (#56) on ShaderGraph's editor UI? Recommended: Yes
+
 ---
 
 ## 46: USD / RealityKit ShaderGraph (ND_RealityKit*) nodes are not supported
@@ -804,6 +817,9 @@ updated: 2026-11-23T12:55:47Z
 +++
 
 Reality Composer Pro and USD files on this machine use Apple's MaterialX extensions (ShaderGraph.framework apple_nodedefs, CoreUSDEdit aapl nodes, ND_RealityKitTexture2D etc.). Documents that use them fail with missingNodeDef.
+
+- `2026-11-23T13:35:18Z`: Apple's nodedefs are in /System/Library/SubFrameworks/ShaderGraph.framework/Versions/A/Resources/MaterialX/Apple/apple_nodedefs (14 files, ~1,450 nodedefs, MaterialX 1.38, generated). Their implementations are target="realitykit" function names with no source, and they use types the bundled libraries lack (integer2, ...). The files are Apple's and cannot be vendored.
+- `2026-11-23T13:35:18Z`: Question 1 (design): Support RealityKit documents by loading Apple's nodedefs from the system ShaderGraph.framework at run time (opt-in, so they parse and validate) and implementing their Metal functions by hand, starting with the nodes the Reality Composer Pro sample assets actually use? Recommended: Yes, opt-in loading plus the most-used nodes first
 
 ---
 
@@ -940,11 +956,14 @@ status: open
 priority: low
 kind: feature
 labels: effort:m, area:docs
+depends: 41
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:35:00Z
 +++
 
 There is no example that loads a .mtlx file and renders it on a mesh with MetalSprockets, nor a DemoKit / MetalSprocketsExamples entry.
+
+- `2026-11-23T13:35:00Z`: Question 1 (decision): Build the demo (a macOS app via 'xcb new' that loads a .mtlx with DocumentWatcher and shows each stitched output on a quad, plus the mtlx stitch report) after #41 provides the render element, rather than writing ad-hoc render code in the demo now? Recommended: Yes, after #41
 
 ---
 
@@ -969,11 +988,13 @@ There is no command-line tool to list a document's materials and graphs, report 
 ## 56: No node editor for MaterialX graphs
 
 +++
-status: new
+status: open
 priority: medium
 kind: feature
-labels: area:tooling, area:integration
+labels: area:tooling, area:integration, effort:xl
+depends: 45
 created: 2026-11-23T13:31:07Z
+updated: 2026-11-23T13:38:12Z
 +++
 
 There is no visual editor for MaterialX documents. Users cannot see a nodegraph as nodes and wires, add or connect nodes from the bundled libraries, edit input values, or preview the result live.
@@ -982,5 +1003,120 @@ Related:
 - MetalSprocketsShaderGraph already has a node editor built on function stitching (see #45).
 - Documents cannot be written back to .mtlx yet (#8), so edits could not be saved.
 - Live preview needs a render element (#41).
+
+---
+
+## 57: Node implementation rules are duplicated across stitching, coverage and validation
+
++++
+status: open
+priority: medium
+kind: task
+labels: area:architecture, effort:m
+created: 2026-11-23T13:37:47Z
+updated: 2026-11-23T13:38:12Z
++++
+
+Three places independently decide how a MaterialX node maps to an implementation:
+- Builder.resolve in Sources/MaterialXMetal/GraphStitcher.swift
+- GraphStitcher.coverage() in Sources/MaterialXMetal/NodeCoverage.swift
+- Document.validate() in Sources/MaterialX/Validation.swift
+
+Each repeats some of: nodedef selection, the ND_x → mx_x function naming rule, the _<output> suffix for multi-output nodes, the texcoord special case, the functional-nodegraph fallback, and interface-input lookup.
+
+Consequences seen so far:
+- The functional-nodegraph interface-input bug found in #48 had to be fixed in two places.
+- coverage() reports a node as supported from a static walk that can disagree with what stitch() actually does (for example texcoord index != 0, colorspace inlining, value types without a parameter reader).
+
+- `2026-11-23T13:38:12Z`: Related: #58 (both concern Builder in GraphStitcher.swift; a shared resolution step would touch both).
+
+---
+
+## 58: Graph compilation cannot be inspected without a Metal device
+
++++
+status: open
+priority: medium
+kind: task
+labels: area:architecture, effort:l
+created: 2026-11-23T13:37:47Z
+updated: 2026-11-23T13:38:12Z
++++
+
+Builder in Sources/MaterialXMetal/GraphStitcher.swift does graph traversal, parameter layout, colorspace and unit conversion, functional-graph inlining, cycle detection, the cache topology key, the debug description and MTLFunctionStitchingNode construction in one struct. Its only intermediate output is Metal stitching nodes.
+
+Consequences:
+- Every test of graph shape (which functions are called, parameter names and slots, inlining, colorspace wiring) needs a GPU and a stitched library.
+- Logic bugs and Metal stitching failures surface through the same path, which made the stack-overflow crash found in #28 harder to locate.
+- Upcoming signature changes (#22, #23) touch all of these concerns at once.
+
+- `2026-11-23T13:38:12Z`: Related: #57 (node resolution duplicated in coverage and validation) and #61 (GPU-only checks).
+
+---
+
+## 59: Parameter buffer layout is spread over four places
+
++++
+status: open
+priority: low
+kind: task
+labels: area:architecture, effort:m
+created: 2026-11-23T13:37:47Z
+updated: 2026-11-23T13:38:12Z
++++
+
+The layout of the constant-input buffer (one float4 slot per value, one per column for matrices, pointer advanced lazily between parameters) is encoded separately in:
+- Builder.parameter / Builder.slots (GraphStitcher.swift)
+- StitchedGraph: parameters, slot/slotCount, set(_:to:), carryParameters(from:), initialParameterData
+- the Metal readers mx_parameter_* and mx_parameter_next (StandardLibrary.metal)
+- the mtlx stitch command, which formats slots for display
+
+All four must agree. Any layout change, such as the packing asked about in #24-Q1, has to edit all of them, and nothing checks that they stay consistent.
+
+- `2026-11-23T13:38:12Z`: Related: #24 (parameter packing question #24-Q1 would change all four places).
+
+---
+
+## 60: Document is a raw XML tree plus eagerly copied typed views
+
++++
+status: open
+priority: low
+kind: task
+labels: area:architecture, effort:m, breaking
+created: 2026-11-23T13:37:47Z
+updated: 2026-11-23T13:38:12Z
++++
+
+Document (Sources/MaterialX/Document.swift) builds nodeDefs, nodeGraphs and nodes from root once in init. Extensions in Looks.swift and Filenames.swift instead read root on every call. Node, Input and NodeGraph each keep a copy of their Element. Writer.swift serializes only the Element tree.
+
+Consequences:
+- Editing a document means mutating root and constructing a new Document; the typed views cannot be edited directly.
+- The same information exists twice (typed fields and the element copy) and can drift.
+- StandardLibrary.merging(_:) rebuilds the whole library from all documents for every merge.
+- A node editor (#56) needs to edit documents in place.
+
+- `2026-11-23T13:38:12Z`: Related: #56 (node editor needs in-place edits) and #10 (public type naming).
+
+---
+
+## 61: GPU evaluation of stitched graphs exists only as copied test code
+
++++
+status: open
+priority: low
+kind: task
+labels: area:architecture, effort:s
+created: 2026-11-23T13:37:47Z
+updated: 2026-11-23T13:38:12Z
++++
+
+Running a stitched graph and reading its result back is implemented only in tests:
+- StitchingTests.evaluate, called by about ten other suites
+- separate copies of the same kernel and buffer setup in ReferenceImplementationTests and StitchingPerformanceTests
+
+The kernel source hard-codes the stitched function signature, so #22 will need every copy updated. The mtlx CLI and debugging tools cannot evaluate a graph.
+
+- `2026-11-23T13:38:12Z`: Related: #22 (signature change would update every copy) and #58.
 
 ---
