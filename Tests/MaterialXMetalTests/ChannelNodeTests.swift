@@ -210,3 +210,22 @@ struct MultiOutputTests {
         #expect(try StitchingTests().evaluate(stitched, device: device, returnType: "vector2")[0] == [3, 4, 0, 1])
     }
 }
+
+/// #17: texcoord index 1 must not silently read UV set 0.
+@Suite(.serialized)
+struct TexcoordIndexTests {
+    @Test func secondUVSetIsRejected() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let source = """
+        <materialx version="1.39"><nodegraph name="g">
+          <texcoord name="n" type="vector2"><input name="index" type="integer" value="1" /></texcoord>
+          <output name="out" type="vector2" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let document = try Document(data: Data(source.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        #expect(throws: MaterialXError.self) {
+            try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
+        }
+    }
+}

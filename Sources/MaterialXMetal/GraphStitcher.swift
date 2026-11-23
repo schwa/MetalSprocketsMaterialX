@@ -172,6 +172,10 @@ private struct Builder {
 
         let stitchingNode: MTLFunctionStitchingNode
         if node.category == "texcoord" {
+            // Only one UV set reaches the stitched function until the shading context grows (#22).
+            if let index = node.input("index")?.value?.numbers?.first, index != 0 {
+                throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'")
+            }
             stitchingNode = try call("mx_texcoord_vector2", [texcoord])
         } else {
             guard let nodeDef = stitcher.standardLibrary.nodeDef(for: node) else {

@@ -263,11 +263,14 @@ status: open
 priority: medium
 kind: bug
 labels: effort:s, area:nodes, area:geometry
+depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:05:26Z
 +++
 
 texcoord nodes always read the single texcoord argument; index=1 (second UV set) behaves like index=0.
+
+- `2026-11-23T13:05:26Z`: texcoord with index != 0 now throws unsupportedNode instead of silently reading UV set 0 (test secondUVSetIsRejected). Reading the second set needs the shading context from #22.
 
 ---
 
