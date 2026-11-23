@@ -317,6 +317,24 @@ private struct Builder {
     var slotPointer = GraphPlan.Operand.parameters
     var previousSlotCount = 0
 
+    /// The nodedef inputs a Metal function takes: stitchable values, plus `space`, which becomes an integer. Other
+    /// string inputs, such as geompropvalue's `geomprop` name, are resolved by the stitcher and not passed.
+    static func functionInputs(_ nodeDef: NodeDef) -> [Input] {
+        nodeDef.inputs.filter { $0.type.isStitchable || ($0.name == "space" && $0.type == .string) }
+    }
+
+    /// The integer the Metal geometry functions take for a `space` input: 0 object (and model), 1 world.
+    static func spaceCode(_ value: Value?) throws -> Int {
+        guard case let .string(space) = value ?? .string("object") else {
+            throw MaterialXError.invalidValue("space \(String(describing: value))")
+        }
+        switch space {
+        case "object", "model": return 0
+        case "world": return 1
+        default: throw MaterialXError.invalidValue("space '\(space)'")
+        }
+    }
+
     /// Node categories whose functions take the shading context before the nodedef's inputs.
     static let contextCategories: Set<String> = ["texcoord", "position", "normal", "tangent", "bitangent", "geomcolor", "viewdirection", "time", "frame"]
 
@@ -388,6 +406,11 @@ private struct Builder {
             if let cached = nodeArguments[argumentKey] {
                 return cached
             }
+            if definition.name == "space", definition.type == .string {
+                let argument = try parameter(name: argumentKey, type: .integer, value: .integer(Self.spaceCode(node.input("space")?.value ?? definition.value)))
+                nodeArguments[argumentKey] = argument
+                return argument
+            }
             let argument = try resolve(input: node.input(definition.name), definition: definition, owner: nodeKey, nodeColorSpace: node.element["colorspace"] ?? scope.colorSpace, in: scope)
             nodeArguments[argumentKey] = argument
             return argument
@@ -400,9 +423,9 @@ private struct Builder {
             }
             stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
         case let .function(functionName) where Self.contextCategories.contains(node.category):
-            stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
+            stitchingNode = try call(functionName, [.context] + Self.functionInputs(nodeDef).map(argument))
         case let .function(functionName):
-            stitchingNode = try call(functionName, nodeDef.inputs.map(argument))
+            stitchingNode = try call(functionName, Self.functionInputs(nodeDef).map(argument))
         case let .nodeGraph(implementation):
             // Inputs with no stitchable value type (filenames, strings) are left unbound; the graph only fails if it
             // reads one.

@@ -71,6 +71,32 @@ MX_EVALUATE(boolean, bool, float4(value ? 1.0 : 0.0, 0, 0, 1))
 // Geometric nodes take the shading context as their first argument, before the nodedef's inputs.
 [[stitchable]] float2 mx_texcoord_vector2(MXContext context, int index) { return context.texcoord[clamp(index, 0, 1)]; }
 
+// `space` arrives as an integer: 0 object (and model), 1 world. See Builder.spaceCode.
+[[stitchable]] float3 mx_position_vector3(MXContext context, int space) { return space == 1 ? context.positionWorld : context.positionObject; }
+[[stitchable]] float3 mx_normal_vector3(MXContext context, int space) { return space == 1 ? context.normalWorld : context.normalObject; }
+// The context has one tangent frame, so `index` (UV set) is ignored.
+[[stitchable]] float3 mx_tangent_vector3(MXContext context, int space, int) { return space == 1 ? context.tangentWorld : context.tangentObject; }
+[[stitchable]] float3 mx_bitangent_vector3(MXContext context, int space, int) { return space == 1 ? context.bitangentWorld : context.bitangentObject; }
+[[stitchable]] float3 mx_viewdirection_vector3(MXContext context, int space) { return space == 1 ? context.viewDirectionWorld : context.viewDirectionObject; }
+// One vertex color set.
+[[stitchable]] float mx_geomcolor_float(MXContext context, int) { return context.vertexColor.r; }
+[[stitchable]] float3 mx_geomcolor_color3(MXContext context, int) { return context.vertexColor.rgb; }
+[[stitchable]] float4 mx_geomcolor_color4(MXContext context, int) { return context.vertexColor; }
+[[stitchable]] float mx_frame_float(MXContext context) { return context.frame; }
+// MaterialX defines time as frame / fps.
+[[stitchable]] float mx_time_float(MXContext context, float fps) { return context.frame / fps; }
+
+// Named geometric properties are not in the context, so geompropvalue returns its default, as MaterialX does when
+// the property is missing. The `geomprop` name is dropped by the stitcher.
+[[stitchable]] float mx_geompropvalue_float(float fallback) { return fallback; }
+[[stitchable]] int mx_geompropvalue_integer(int fallback) { return fallback; }
+[[stitchable]] bool mx_geompropvalue_boolean(bool fallback) { return fallback; }
+[[stitchable]] float2 mx_geompropvalue_vector2(float2 fallback) { return fallback; }
+[[stitchable]] float3 mx_geompropvalue_vector3(float3 fallback) { return fallback; }
+[[stitchable]] float4 mx_geompropvalue_vector4(float4 fallback) { return fallback; }
+[[stitchable]] float3 mx_geompropvalue_color3(float3 fallback) { return fallback; }
+[[stitchable]] float4 mx_geompropvalue_color4(float4 fallback) { return fallback; }
+
 // MARK: Math
 
 #define MX_BINARY(NAME, EXPR, SUFFIX, T, U) \

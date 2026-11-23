@@ -272,19 +272,21 @@ noise2d, noise3d, fractal2d/3d, cellnoise2d/3d, worleynoise2d/3d, unifiednoise2d
 ## 16: Geometric nodes other than texcoord are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, area:nodes, area:geometry
 depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:59:10Z
+updated: 2026-11-23T13:48:38Z
+closed: 2026-11-23T13:48:38Z
 +++
 
 position, normal, tangent, bitangent, geomcolor, geompropvalue, time, frame, viewdirection and the space input (model/object/world) are not available. The stitched function only receives a texture coordinate.
 
 - `2026-11-23T12:59:10Z`: Question 1 (decision): Implement position/normal/tangent/bitangent/geomcolor/time/frame/viewdirection as readers of the MXShadingContext proposed in #22-Q1 once that is answered, with the space input (model/object/world) choosing between the struct's object and world fields? Recommended: Yes
 - `2026-11-23T13:40:33Z`: Answer 1: YES
+- `2026-11-23T13:48:38Z`: position, normal, tangent, bitangent (space object/model/world), viewdirection, geomcolor (float/color3/color4), frame, time (frame / fps, per MaterialX) read MXShadingContext; space strings become an integer parameter. Added viewDirectionObject to the context. geompropvalue returns its default: named geometric properties are not in the context (MaterialX does the same when a property is missing). tangent/bitangent index and geomcolor index are ignored (one tangent frame, one color set). Tests: GeometryNodeTests. Coverage baseline regenerated.
 
 ---
 

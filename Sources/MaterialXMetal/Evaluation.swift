@@ -16,6 +16,7 @@ public extension MXShadingContext {
         bitangentWorld = [0, 0, 1]
         bitangentObject = [0, 0, 1]
         viewDirectionWorld = [0, 1, 0]
+        viewDirectionObject = [0, 1, 0]
         self.texcoord = (texcoord, texcoord)
         vertexColor = [1, 1, 1, 1]
     }

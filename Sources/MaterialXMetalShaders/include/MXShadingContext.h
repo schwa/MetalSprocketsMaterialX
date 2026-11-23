@@ -27,9 +27,11 @@ typedef struct MXShadingContext {
     MXFloat3 bitangentObject;
     /// From the surface point towards the viewer, normalized.
     MXFloat3 viewDirectionWorld;
+    MXFloat3 viewDirectionObject;
     /// UV sets 0 and 1.
     MXFloat2 texcoord[2];
     MXFloat4 vertexColor;
+    /// Seconds. MaterialX's <time> node is frame / fps instead; this is for host-specific nodes.
     float time;
     float frame;
 } MXShadingContext;

@@ -574,3 +574,52 @@ struct ShadingContextTests {
         #expect(StitchedGraph.Argument.context.rawValue == 0)
     }
 }
+
+/// #16: geometric nodes read the shading context.
+@Suite(.serialized)
+struct GeometryNodeTests {
+    func evaluate(_ body: String, type: String, context: MXShadingContext) throws -> SIMD4<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        return try #require(try stitched.evaluate(contexts: [context]).first)
+    }
+
+    static var context: MXShadingContext {
+        var context = MXShadingContext(texcoord: .zero)
+        context.positionWorld = [1, 2, 3]
+        context.positionObject = [4, 5, 6]
+        context.normalWorld = [0, 0, 1]
+        context.normalObject = [1, 0, 0]
+        context.tangentWorld = [0, 1, 0]
+        context.bitangentObject = [0, 0, -1]
+        context.viewDirectionWorld = [0.6, 0.8, 0]
+        context.vertexColor = [0.1, 0.2, 0.3, 0.4]
+        context.frame = 48
+        return context
+    }
+
+    @Test func spaceSelectsWorldOrObject() throws {
+        #expect(try evaluate("<position name=\"n\" type=\"vector3\"><input name=\"space\" type=\"string\" value=\"world\" /></position>", type: "vector3", context: Self.context) == [1, 2, 3, 1])
+        #expect(try evaluate("<position name=\"n\" type=\"vector3\" />", type: "vector3", context: Self.context) == [4, 5, 6, 1])
+        #expect(try evaluate("<normal name=\"n\" type=\"vector3\"><input name=\"space\" type=\"string\" value=\"model\" /></normal>", type: "vector3", context: Self.context) == [1, 0, 0, 1])
+        #expect(try evaluate("<tangent name=\"n\" type=\"vector3\"><input name=\"space\" type=\"string\" value=\"world\" /></tangent>", type: "vector3", context: Self.context) == [0, 1, 0, 1])
+        #expect(try evaluate("<bitangent name=\"n\" type=\"vector3\" />", type: "vector3", context: Self.context) == [0, 0, -1, 1])
+        #expect(try evaluate("<viewdirection name=\"n\" type=\"vector3\" />", type: "vector3", context: Self.context) == [0.6, 0.8, 0, 1])
+    }
+
+    @Test func colorTimeFrameAndGeomprop() throws {
+        #expect(try evaluate("<geomcolor name=\"n\" type=\"color4\" />", type: "color4", context: Self.context) == [0.1, 0.2, 0.3, 0.4])
+        #expect(try evaluate("<frame name=\"n\" type=\"float\" />", type: "float", context: Self.context).x == 48)
+        #expect(try evaluate("<time name=\"n\" type=\"float\" />", type: "float", context: Self.context).x == 2) // 48 / 24 fps
+        let prop = "<geompropvalue name=\"n\" type=\"color3\"><input name=\"geomprop\" type=\"string\" value=\"Cd\" /><input name=\"default\" type=\"color3\" value=\"0.5, 0.25, 1\" /></geompropvalue>"
+        #expect(try evaluate(prop, type: "color3", context: Self.context) == [0.5, 0.25, 1, 1])
+    }
+
+    @Test func badSpaceThrows() throws {
+        #expect(throws: MaterialXError.self) {
+            try evaluate("<position name=\"n\" type=\"vector3\"><input name=\"space\" type=\"string\" value=\"screen\" /></position>", type: "vector3", context: Self.context)
+        }
+    }
+}
