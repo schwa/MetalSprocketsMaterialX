@@ -3,5 +3,6 @@
 .swiftpm/
 xcuserdata/
 DerivedData/
+ExternalMaterials/
 .xcb-cache.json
 .ci-spm/
