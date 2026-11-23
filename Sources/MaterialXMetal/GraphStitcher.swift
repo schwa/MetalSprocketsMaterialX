@@ -91,6 +91,31 @@ public struct StitchedGraph: @unchecked Sendable {
     public var parameterData: [SIMD4<Float>]
 
     public func parameter(_ name: String) -> Parameter? { parameters.first { $0.name == name } }
+
+    /// Writes `value` into the slots of parameter `name`. Throws if there is no such parameter or the value does
+    /// not have the parameter type's component count.
+    public mutating func set(_ name: String, to value: Value) throws {
+        guard let parameter = parameter(name) else {
+            throw MaterialXError.invalidValue("no parameter '\(name)'")
+        }
+        guard let numbers = value.numbers, numbers.count == parameter.type.componentCount else {
+            throw MaterialXError.invalidValue("\(value) for parameter '\(name)' of type \(parameter.type)")
+        }
+        let slots = Builder.slots(for: parameter.type, numbers: numbers)
+        parameterData.replaceSubrange(parameter.slot..<(parameter.slot + parameter.slotCount), with: slots)
+    }
+
+    public mutating func set(_ name: String, to value: Float) throws {
+        try set(name, to: .numbers([value]))
+    }
+
+    public mutating func set(_ name: String, to value: SIMD3<Float>) throws {
+        try set(name, to: .numbers([value.x, value.y, value.z]))
+    }
+
+    public mutating func set(_ name: String, to value: SIMD4<Float>) throws {
+        try set(name, to: .numbers([value.x, value.y, value.z, value.w]))
+    }
 }
 
 /// Compiles MaterialX nodegraphs into stitched Metal functions.

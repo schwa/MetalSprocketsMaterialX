@@ -429,3 +429,22 @@ struct DeepGraphTests {
         }
     }
 }
+
+/// #24: typed parameter setters, checked against the parameter's type.
+@Suite(.serialized)
+struct ParameterSetterTests {
+    @Test func setByNameWithTypeChecks() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(StitchingTests.document.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        var stitched = try stitcher.stitch(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
+
+        try stitched.set("tint", to: Value.numbers([1, 1, 1]))
+        try stitched.set("blend.mix", to: 1)
+        #expect(try StitchingTests().evaluate(stitched, device: device)[0] == [2, 2, 2, 1])
+
+        #expect(throws: MaterialXError.self) { try stitched.set("tint", to: 0.5) }
+        #expect(throws: MaterialXError.self) { try stitched.set("missing", to: 1) }
+        #expect(throws: MaterialXError.self) { try stitched.set("tint", to: Value.numbers([1, 1])) }
+    }
+}
