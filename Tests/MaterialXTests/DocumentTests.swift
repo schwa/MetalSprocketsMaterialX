@@ -84,6 +84,50 @@ struct DocumentTests {
         #expect(FilenamePattern("t.<UVTILE>.png").filename(u: 0, v: 0) == "t.u1_v1.png")
     }
 
+    /// #9: validation reports broken references and type mismatches.
+    @Test func validationReportsProblems() throws {
+        let source = """
+        <materialx version="1.39">
+          <nodegraph name="g">
+            <input name="tint" type="color3" value="1, 1, 1" />
+            <constant name="f" type="float"><input name="value" type="float" value="1" /></constant>
+            <multiply name="bad_type" type="color3">
+              <input name="in1" type="color3" nodename="f" />
+              <input name="in2" type="float" interfacename="missing" />
+            </multiply>
+            <add name="dangling" type="color3"><input name="in1" type="color3" nodename="nowhere" /></add>
+            <frobnicate name="unknown" type="float" />
+            <output name="out" type="color3" nodename="bad_type" />
+          </nodegraph>
+          <standard_surface name="s" type="surfaceshader">
+            <input name="base_color" type="color3" nodegraph="g" output="nope" />
+          </standard_surface>
+        </materialx>
+        """
+        let issues = try Document(data: Data(source.utf8)).validate().map(\.description)
+        #expect(issues.contains { $0.hasPrefix("g/bad_type.in1: type color3 does not match 'f'") })
+        #expect(issues.contains { $0.hasPrefix("g/bad_type.in2: interface input 'missing'") })
+        #expect(issues.contains { $0.hasPrefix("g/dangling.in1: node 'nowhere'") })
+        #expect(issues.contains { $0.hasPrefix("g/unknown: no nodedef") })
+        #expect(issues.contains { $0.hasPrefix("s.base_color: nodegraph 'g' has no output 'nope'") })
+        #expect(issues.count == 5, "\(issues)")
+    }
+
+    @Test func validDocumentHasNoIssues() throws {
+        let source = """
+        <materialx version="1.39">
+          <nodegraph name="g">
+            <separate3 name="parts" type="multioutput"><input name="in" type="color3" value="1, 2, 3" /></separate3>
+            <multiply name="m" type="float"><input name="in1" type="float" nodename="parts" output="outr" /></multiply>
+            <output name="out" type="float" nodename="m" />
+          </nodegraph>
+          <standard_surface name="s" type="surfaceshader"><input name="base" type="float" nodegraph="g" output="out" /></standard_surface>
+          <surfacematerial name="mat" type="material"><input name="surfaceshader" type="surfaceshader" nodename="s" /></surfacematerial>
+        </materialx>
+        """
+        #expect(try Document(data: Data(source.utf8)).validate().isEmpty)
+    }
+
     @Test func nodeDefMatchesFloatArgumentVariant() throws {
         let node = try Node(Element(tag: "multiply", attributes: ["name": "m", "type": "color3"], children: [
             Element(tag: "input", attributes: ["name": "in1", "type": "color3", "value": "1, 1, 1"]),

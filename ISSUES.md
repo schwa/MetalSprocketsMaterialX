@@ -142,15 +142,18 @@ Document and Element are read-only. There is no serializer, so tools cannot edit
 ## 9: No document validation
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:m, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:09:03Z
+closed: 2026-11-23T13:09:03Z
 +++
 
 Documents are trusted as given. There is no check for dangling nodename references, type mismatches between connected inputs and outputs, unknown categories, or interfacename pointing at missing inputs, so errors only appear at stitch time or not at all.
+
+- `2026-11-23T13:09:03Z`: Document.validate(library:) returns ValidationIssues for dangling nodename/nodegraph/output/interfacename, unknown node categories, missing multi-output outputs and type mismatches on connections. Tests: validationReportsProblems, validDocumentHasNoIssues.
 
 ---
 
