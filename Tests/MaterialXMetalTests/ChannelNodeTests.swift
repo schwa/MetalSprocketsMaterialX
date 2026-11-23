@@ -481,3 +481,39 @@ struct CarryParametersTests {
         #expect(new.parameterData[try #require(new.parameter("blend.mix")).slot].x == 0.25)
     }
 }
+
+/// #58: a graph's compiled shape can be inspected without stitching or running it.
+@Suite(.serialized)
+struct GraphPlanTests {
+    @Test func planShowsCallsWiringAndParameters() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let nodeLibrary = try MetalNodeLibrary(device: device)
+        let stitcher = GraphStitcher(nodeLibrary: nodeLibrary)
+        let document = try Document(data: Data(StitchingTests.document.utf8))
+        let plan = try stitcher.plan(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
+        #expect(nodeLibrary.stitchCount == 0)
+        #expect(plan.parameters.map(\.name) == ["tint", "scaled.in2", "blend.bg", "blend.mix"])
+        let multiply = try #require(plan.calls(for: "scaled").first)
+        #expect(multiply.function == "mx_multiply_color3FA")
+        let mix = try #require(plan.calls(for: "blend").first)
+        #expect(mix.function == "mx_mix_color3")
+        let multiplyIndex = try #require(plan.calls.firstIndex(of: multiply))
+        #expect(mix.arguments.first == .call(multiplyIndex))
+        #expect(plan.calls.last?.function == "mx_output_vector3")
+        #expect(plan.calls.last?.arguments.suffix(2) == [.texcoord, .parameters])
+    }
+
+    @Test func colorspaceConversionIsInlinedIntoThePlan() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let xml = """
+        <materialx version="1.39" colorspace="srgb_texture"><nodegraph name="g">
+          <add name="n" type="color3"><input name="in1" type="color3" value="0.5, 0.5, 0.5" /></add>
+          <output name="out" type="color3" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let document = try Document(data: Data(xml.utf8))
+        let plan = try stitcher.plan(try #require(document.nodeGraph("g")), functionName: "f", documentColorSpace: document.colorSpace)
+        #expect(plan.calls.contains { ($0.origin ?? "").hasPrefix("n.in1#colorspace/") })
+    }
+}

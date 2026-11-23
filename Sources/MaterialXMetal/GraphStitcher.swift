@@ -171,6 +171,12 @@ public struct GraphStitcher {
     /// Compiles `graph`'s output. Color constants tagged with a `colorspace` (on the input, its node, the graph, or
     /// `documentColorSpace`) are converted to lin_rec709; values with a `unit` are converted to ``targetUnits``.
     public func stitch(_ graph: NodeGraph, output outputName: String? = nil, functionName: String, documentColorSpace: String? = nil) throws -> StitchedGraph {
+        try stitch(plan(graph, output: outputName, functionName: functionName, documentColorSpace: documentColorSpace))
+    }
+
+    /// What ``stitch(_:output:functionName:documentColorSpace:)`` would build, without building it: the function
+    /// calls, their wiring and the parameter layout. Nothing is compiled or run on the GPU.
+    public func plan(_ graph: NodeGraph, output outputName: String? = nil, functionName: String, documentColorSpace: String? = nil) throws -> GraphPlan {
         guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
             throw MaterialXError.invalidDocument("nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
@@ -180,28 +186,109 @@ public struct GraphStitcher {
         var builder = Builder(stitcher: self)
         let scope = Builder.Scope(graph: graph, prefix: "", bindings: [:], colorSpace: graph.element["colorspace"] ?? documentColorSpace)
         let value = try builder.resolve(nodeName: nodeName, output: output.output, in: scope)
-        let outputNode = try builder.call("mx_output_" + output.type.metalSuffix(), [value, builder.texcoord, builder.parametersArgument])
-        let key = functionName + "\n" + builder.topology.joined(separator: "\n")
-        let (library, function) = try nodeLibrary.stitchedFunction(key: key) {
-            let stitchingGraph = MTLFunctionStitchingGraph(functionName: functionName, nodes: builder.functionNodes, outputNode: outputNode, attributes: [])
-            let descriptor = MTLStitchedLibraryDescriptor()
-            descriptor.functionGraphs = [stitchingGraph]
-            descriptor.functions = Array(builder.functions.values)
-            let library: MTLLibrary
-            do {
-                library = try nodeLibrary.device.makeLibrary(stitchedDescriptor: descriptor)
-            } catch {
-                throw MaterialXError.stitchingFailed("\(error.localizedDescription)\n\(builder.graphDescription(functionName: functionName))")
-            }
-            guard let function = library.makeFunction(name: functionName) else {
-                throw MaterialXError.stitchingFailed("stitched library is missing \(functionName)\n\(builder.graphDescription(functionName: functionName))")
-            }
-            return (library, function)
+        _ = try builder.call("mx_output_" + output.type.metalSuffix(), [value, .texcoord, .parameters])
+        return GraphPlan(functionName: functionName, outputType: output.type, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData)
+    }
+
+    /// Builds `plan` with Metal function stitching, reusing a cached library when the wiring matches.
+    public func stitch(_ plan: GraphPlan) throws -> StitchedGraph {
+        let (library, function) = try nodeLibrary.stitchedFunction(key: plan.topologyKey) {
+            try nodeLibrary.makeStitchedFunction(plan)
         }
-        var stitched = StitchedGraph(library: library, function: function, functionName: functionName, outputType: output.type, parameters: builder.parameters, parameterData: builder.parameterData)
-        stitched.graphDescription = builder.graphDescription(functionName: functionName)
-        stitched.initialParameterData = stitched.parameterData
+        var stitched = StitchedGraph(library: library, function: function, functionName: plan.functionName, outputType: plan.outputType, parameters: plan.parameters, parameterData: plan.parameterData)
+        stitched.graphDescription = plan.description
+        stitched.initialParameterData = plan.parameterData
         return stitched
+    }
+}
+
+/// A compiled nodegraph before Metal sees it: function calls in dependency order, the last being the output.
+public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
+    public enum Operand: Hashable, Sendable {
+        /// Argument 0 of the stitched function.
+        case texcoord
+        /// Argument 1 of the stitched function, or the parameter pointer before it is advanced.
+        case parameters
+        /// The result of `calls[index]`.
+        case call(Int)
+    }
+
+    public struct Call: Hashable, Sendable {
+        public var function: String
+        public var arguments: [Operand]
+        /// The MaterialX node (scoped as `graph-node/inner-node`) this call implements, if any.
+        public var origin: String?
+    }
+
+    public var functionName: String
+    public var outputType: ValueType
+    public var calls: [Call]
+    public var parameters: [StitchedGraph.Parameter]
+    public var parameterData: [SIMD4<Float>]
+
+    /// The calls made for MaterialX node `origin`.
+    public func calls(for origin: String) -> [Call] {
+        calls.filter { $0.origin == origin }
+    }
+
+    /// Function name plus wiring. Graphs that differ only in constant values share it.
+    var topologyKey: String {
+        ([functionName] + calls.map(Self.line)).joined(separator: "\n")
+    }
+
+    public var description: String {
+        let lines = calls.enumerated().map { index, call in
+            "  n\(index) = \(Self.line(call))" + (call.origin.map { "  // \($0)" } ?? "")
+        }
+        return "\(functionName)(arg0: texcoord, arg1: parameters):\n" + lines.joined(separator: "\n")
+    }
+
+    static func line(_ call: Call) -> String {
+        let arguments = call.arguments.map { operand in
+            switch operand {
+            case .texcoord: "arg0"
+            case .parameters: "arg1"
+            case let .call(index): "n\(index)"
+            }
+        }
+        return call.function + "(" + arguments.joined(separator: ",") + ")"
+    }
+}
+
+extension MetalNodeLibrary {
+    func makeStitchedFunction(_ plan: GraphPlan) throws -> (MTLLibrary, MTLFunction) {
+        let inputs = [
+            GraphPlan.Operand.texcoord: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.texcoord.rawValue),
+            .parameters: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.parameters.rawValue),
+        ]
+        var nodes: [MTLFunctionStitchingFunctionNode] = []
+        var functions: [String: MTLFunction] = [:]
+        for call in plan.calls {
+            functions[call.function] = try function(named: call.function)
+            let arguments: [MTLFunctionStitchingNode] = call.arguments.map { operand in
+                if case let .call(index) = operand {
+                    return nodes[index]
+                }
+                return inputs[operand] ?? MTLFunctionStitchingInputNode(argumentIndex: 0)
+            }
+            nodes.append(MTLFunctionStitchingFunctionNode(name: call.function, arguments: arguments, controlDependencies: []))
+        }
+        guard let outputNode = nodes.last else {
+            throw MaterialXError.stitchingFailed("empty plan\n\(plan)")
+        }
+        let descriptor = MTLStitchedLibraryDescriptor()
+        descriptor.functionGraphs = [MTLFunctionStitchingGraph(functionName: plan.functionName, nodes: nodes, outputNode: outputNode, attributes: [])]
+        descriptor.functions = Array(functions.values)
+        let library: MTLLibrary
+        do {
+            library = try device.makeLibrary(stitchedDescriptor: descriptor)
+        } catch {
+            throw MaterialXError.stitchingFailed("\(error.localizedDescription)\n\(plan)")
+        }
+        guard let function = library.makeFunction(name: plan.functionName) else {
+            throw MaterialXError.stitchingFailed("stitched library is missing \(plan.functionName)\n\(plan)")
+        }
+        return (library, function)
     }
 }
 
@@ -212,59 +299,33 @@ private struct Builder {
         var graph: NodeGraph
         var prefix: String
         /// Interface inputs bound to the calling node's arguments. Unbound ones become parameters.
-        var bindings: [String: MTLFunctionStitchingNode]
+        var bindings: [String: GraphPlan.Operand]
         /// The inherited colorspace for color values. `nil` inside functional nodegraphs, whose constants are raw.
         var colorSpace: String?
     }
 
     let stitcher: GraphStitcher
-    var functions: [String: MTLFunction] = [:]
-    var functionNodes: [MTLFunctionStitchingFunctionNode] = []
-    var resolved: [String: MTLFunctionStitchingNode] = [:]
-    var nodeArguments: [String: MTLFunctionStitchingNode] = [:]
+    var calls: [GraphPlan.Call] = []
+    var resolved: [String: GraphPlan.Operand] = [:]
+    var nodeArguments: [String: GraphPlan.Operand] = [:]
     var visiting: Set<String> = []
     var parameters: [StitchedGraph.Parameter] = []
     var parameterData: [SIMD4<Float>] = []
-    var interfaceNodes: [String: MTLFunctionStitchingNode] = [:]
-    let parametersArgument = MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.parameters.rawValue)
+    var interfaceNodes: [String: GraphPlan.Operand] = [:]
     /// The pointer to the current parameter slot.
-    var slotPointer: MTLFunctionStitchingNode
+    var slotPointer = GraphPlan.Operand.parameters
     var previousSlotCount = 0
-    let texcoord = MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.texcoord.rawValue)
 
     init(stitcher: GraphStitcher) {
         self.stitcher = stitcher
-        slotPointer = parametersArgument
     }
 
-    /// One line per function node: its name and the wiring of its arguments. Identifies the stitched function.
-    var topology: [String] = []
-    /// The MaterialX node (scoped key) each function node implements, by function node index.
-    var origins: [Int: String] = [:]
-
-    func graphDescription(functionName: String) -> String {
-        let lines = topology.enumerated().map { index, line in
-            "  n\(index) = \(line)" + (origins[index].map { "  // \($0)" } ?? "")
+    mutating func call(_ name: String, _ arguments: [GraphPlan.Operand]) throws -> GraphPlan.Operand {
+        guard stitcher.nodeLibrary.hasFunction(named: name) else {
+            throw MaterialXError.unsupportedNode(name)
         }
-        return "\(functionName)(arg0: texcoord, arg1: parameters):\n" + lines.joined(separator: "\n")
-    }
-
-    var nodeIndices: [ObjectIdentifier: Int] = [:]
-
-    func topologyName(_ node: MTLFunctionStitchingNode) -> String {
-        if let input = node as? MTLFunctionStitchingInputNode {
-            return "arg\(input.argumentIndex)"
-        }
-        return "n\(nodeIndices[ObjectIdentifier(node)] ?? -1)"
-    }
-
-    mutating func call(_ name: String, _ arguments: [MTLFunctionStitchingNode]) throws -> MTLFunctionStitchingFunctionNode {
-        functions[name] = try stitcher.nodeLibrary.function(named: name)
-        let node = MTLFunctionStitchingFunctionNode(name: name, arguments: arguments, controlDependencies: [])
-        topology.append(name + "(" + arguments.map(topologyName).joined(separator: ",") + ")")
-        nodeIndices[ObjectIdentifier(node)] = functionNodes.count
-        functionNodes.append(node)
-        return node
+        calls.append(.init(function: name, arguments: arguments))
+        return .call(calls.count - 1)
     }
 
     /// Resolves `nodeName`'s upstream nodes first, deepest first, with an explicit stack. Each ``resolve`` then finds
@@ -295,7 +356,7 @@ private struct Builder {
     }
 
     /// The stitching node for `output` of `nodeName` (the only output when `nil`).
-    mutating func resolve(nodeName: String, output outputName: String? = nil, in scope: Scope, resolvingUpstream: Bool = true) throws -> MTLFunctionStitchingNode {
+    mutating func resolve(nodeName: String, output outputName: String? = nil, in scope: Scope, resolvingUpstream: Bool = true) throws -> GraphPlan.Operand {
         if resolvingUpstream, resolved[scope.prefix + nodeName + (outputName.map { "." + $0 } ?? "")] == nil {
             try resolveUpstream(of: nodeName, in: scope)
         }
@@ -313,12 +374,12 @@ private struct Builder {
         visiting.insert(key)
         defer { visiting.remove(key) }
 
-        let stitchingNode: MTLFunctionStitchingNode
+        let stitchingNode: GraphPlan.Operand
         guard let nodeDef = stitcher.standardLibrary.nodeDef(for: node) else {
             throw MaterialXError.missingNodeDef(node: "\(node.name) (\(node.category), \(node.type))")
         }
         // Inputs are resolved once per node, so every output of a multi-output node shares them.
-        func argument(_ definition: Input) throws -> MTLFunctionStitchingNode {
+        func argument(_ definition: Input) throws -> GraphPlan.Operand {
             let argumentKey = nodeKey + "." + definition.name
             if let cached = nodeArguments[argumentKey] {
                 return cached
@@ -333,13 +394,13 @@ private struct Builder {
             if let index = node.input("index")?.value?.numbers?.first, index != 0 {
                 throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'")
             }
-            stitchingNode = try call(functionName, [texcoord])
+            stitchingNode = try call(functionName, [.texcoord])
         case let .function(functionName):
             stitchingNode = try call(functionName, nodeDef.inputs.map(argument))
         case let .nodeGraph(implementation):
             // Inputs with no stitchable value type (filenames, strings) are left unbound; the graph only fails if it
             // reads one.
-            var bindings: [String: MTLFunctionStitchingNode] = [:]
+            var bindings: [String: GraphPlan.Operand] = [:]
             for definition in nodeDef.inputs where definition.type.isStitchable {
                 bindings[definition.name] = try argument(definition)
             }
@@ -347,14 +408,14 @@ private struct Builder {
         case let .unsupported(reason):
             throw MaterialXError.unsupportedNode(reason)
         }
-        if let index = nodeIndices[ObjectIdentifier(stitchingNode)], origins[index] == nil {
-            origins[index] = key
+        if case let .call(index) = stitchingNode, calls[index].origin == nil {
+            calls[index].origin = key
         }
         resolved[key] = stitchingNode
         return stitchingNode
     }
 
-    mutating func inline(_ graph: NodeGraph, output outputName: String?, bindings: [String: MTLFunctionStitchingNode], prefix: String) throws -> MTLFunctionStitchingNode {
+    mutating func inline(_ graph: NodeGraph, output outputName: String?, bindings: [String: GraphPlan.Operand], prefix: String) throws -> GraphPlan.Operand {
         guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
             throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
@@ -368,7 +429,7 @@ private struct Builder {
         throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no connected output")
     }
 
-    mutating func resolve(input: Input?, definition: Input, owner: String, nodeColorSpace: String?, in scope: Scope) throws -> MTLFunctionStitchingNode {
+    mutating func resolve(input: Input?, definition: Input, owner: String, nodeColorSpace: String?, in scope: Scope) throws -> GraphPlan.Operand {
         if let upstream = input?.nodeName {
             return try resolve(nodeName: upstream, output: input?.output, in: scope)
         }
@@ -397,7 +458,7 @@ private struct Builder {
     }
 
     /// `node` converted from `colorSpace` to lin_rec709 with the cmlib nodegraph, for color3/color4 values.
-    mutating func convertColor(_ node: MTLFunctionStitchingNode, type: ValueType, colorSpace: String?, key: String) throws -> MTLFunctionStitchingNode {
+    mutating func convertColor(_ node: GraphPlan.Operand, type: ValueType, colorSpace: String?, key: String) throws -> GraphPlan.Operand {
         guard type == .color3 || type == .color4, let colorSpace, colorSpace != "lin_rec709", colorSpace != "none" else {
             return node
         }
@@ -418,7 +479,7 @@ private struct Builder {
         return .numbers(numbers.map { $0 * from / to })
     }
 
-    mutating func parameter(name: String, type: ValueType, value: Value?) throws -> MTLFunctionStitchingNode {
+    mutating func parameter(name: String, type: ValueType, value: Value?) throws -> GraphPlan.Operand {
         let reader = try "mx_parameter_" + type.metalSuffix()
         let slots = Self.slots(for: type, numbers: value?.numbers ?? [])
         // Advance lazily, past the previous parameter's slots, so the graph has no unused trailing node.

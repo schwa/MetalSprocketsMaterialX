@@ -1042,12 +1042,13 @@ Consequences seen so far:
 ## 58: Graph compilation cannot be inspected without a Metal device
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: area:architecture, effort:l
 created: 2026-11-23T13:37:47Z
-updated: 2026-11-23T13:38:12Z
+updated: 2026-11-23T13:42:20Z
+closed: 2026-11-23T13:42:20Z
 +++
 
 Builder in Sources/MaterialXMetal/GraphStitcher.swift does graph traversal, parameter layout, colorspace and unit conversion, functional-graph inlining, cycle detection, the cache topology key, the debug description and MTLFunctionStitchingNode construction in one struct. Its only intermediate output is Metal stitching nodes.
@@ -1058,6 +1059,7 @@ Consequences:
 - Upcoming signature changes (#22, #23) touch all of these concerns at once.
 
 - `2026-11-23T13:38:12Z`: Related: #57 (node resolution duplicated in coverage and validation) and #61 (GPU-only checks).
+- `2026-11-23T13:42:20Z`: GraphStitcher.plan(_:...) returns a GraphPlan: the function calls in dependency order with their wiring (Operand: texcoord, parameters, call(i)), the MaterialX node each call implements, the parameter layout and values, and the topology key. stitch() is now plan() plus MetalNodeLibrary.makeStitchedFunction, the only code that builds MTLFunctionStitching nodes. Planning needs the node library's function names (so a MetalNodeLibrary, i.e. a device) but never stitches or runs anything. Tests: GraphPlanTests (calls, wiring, parameters, colorspace inlining, stitchCount stays 0).
 
 ---
 
