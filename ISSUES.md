@@ -645,15 +645,16 @@ status: open
 priority: critical
 kind: feature
 labels: effort:l, area:pbr, area:integration
-depends: 34
+depends: 34, 42
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:56:27Z
+updated: 2026-11-23T14:09:30Z
 +++
 
 PBR.metal reads material values from uniforms and textures directly. There is no visible-function call site (e.g. evaluate material inputs at a surface point) that a stitched MaterialX graph could be linked into, so stitched graphs cannot drive the existing PBR renderer. The change lives in SceneSprockets.
 
 - `2026-11-23T12:56:27Z`: Question 1 (decision): Add an optional [[visible]] material-evaluation call to PBR.metal in SceneSprockets (function-constant gated, so materials without MaterialX pay nothing)? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:09:30Z`: Question 2 (decision): Implement the PBR.metal hook in SceneSprockets after #42 (same blockers: publishing this package, the in-progress GBuffer work there)? Recommended: Yes
 
 ---
 
@@ -789,6 +790,9 @@ SceneSprockets has SceneSprocketsMaterialX (MaterialXDocument, its own XML parse
 
 - `2026-11-23T13:03:12Z`: Question 1 (decision): Should SceneSprocketsMaterialX keep its CPU converter as a fallback and use this package's Document/StandardLibrary for parsing, switching to stitched per-pixel evaluation once #35 lands? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:09:30Z`: Blocked outside this repo (2026-11-23): SceneSprockets has uncommitted work in Sources/SceneSprockets/Renderer/GBuffer.swift and Sources/SceneSprocketsShaders/Metal/GBuffer.metal, and all its dependencies are versioned GitHub URLs, so it cannot depend on this package until it is published.
+- `2026-11-23T14:09:30Z`: Question 2 (decision): May I create github.com/schwa/MetalSprocketsMaterialX, push, and tag 0.1.0, so SceneSprockets can depend on it with .upToNextMinor(from: "0.1.0") like its other packages? Recommended: Yes
+- `2026-11-23T14:09:30Z`: Question 3: Is the uncommitted GBuffer work in SceneSprockets yours/in progress, so I should wait for it to land before changing SceneSprocketsMaterialX? Recommended: Yes, wait
 
 ---
 
@@ -833,18 +837,20 @@ Editing a .mtlx file on disk does not update a running material. Re-stitching on
 ## 45: No relationship defined with MetalSprocketsShaderGraph
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: effort:s, area:integration
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:09:42Z
+closed: 2026-11-23T14:09:42Z
 +++
 
 MetalSprocketsShaderGraph (node editor, own ShaderGraph.swift using function stitching) and MetalSprocketsAddOns' SimpleStitchedFunctionGraph overlap with this package. Whether ShaderGraph can load/save MaterialX or share the node library is not decided.
 
 - `2026-11-23T13:35:24Z`: Question 1 (decision): Make MetalSprocketsShaderGraph use this package as its document format and node library (load/save .mtlx, node palette from StandardLibrary, compile with GraphStitcher), retire SimpleStitchedFunctionGraph in MetalSprocketsAddOns in favor of GraphStitcher, and build the MaterialX node editor (#56) on ShaderGraph's editor UI? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:09:42Z`: Decided (#45-Q1): MetalSprocketsShaderGraph will use this package as its document format and node library (load/save .mtlx via MaterialXDocument/Writer, node palette from StandardLibrary, compile with GraphStitcher), MetalSprocketsAddOns' SimpleStitchedFunctionGraph is to be retired in favor of GraphStitcher, and the MaterialX node editor (#56) builds on ShaderGraph's editor UI. The implementation lives in those repos and, like #42, needs this package published first (#42-Q2).
 
 ---
 
