@@ -821,15 +821,18 @@ SystemMaterialXFiles.urls returns an empty list on machines without RCP or the s
 ## 50: Bundled MaterialX 1.39.4 libraries lack a license file and update process
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:xs, area:build, area:legal
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:15:01Z
+closed: 2026-11-23T13:15:01Z
 +++
 
 Sources/MaterialX/Resources/libraries was copied from RealityComposerPro.app's ShaderGraph.framework (MaterialX 1.39.4, Apache-2.0). The Apache license and NOTICE are not included, and there is no script to update the libraries from upstream.
+
+- `2026-11-23T13:15:01Z`: Added LICENSES/Apache-2.0.txt, NOTICE.md (MaterialX libraries, vendored genglsl impl map with its one fix, ported genglsl code, OSL notice for the HSV functions) and Scripts/update-materialx-libraries.sh (downloads a MaterialX release tag, copies the .mtlx libraries without gen* folders). Running it for v1.39.4 matched the Reality Composer Pro copy except for one file RCP lacked (targets/essl.mtlx), now included.
 
 ---
 
