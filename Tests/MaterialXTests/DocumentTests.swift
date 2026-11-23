@@ -185,3 +185,69 @@ enum SystemMaterialXFiles {
         }
     }
 }
+
+/// #7: looks, material assignment, collections, variants and geominfo.
+struct LookTests {
+    static let source = """
+    <materialx version="1.39">
+      <surfacematerial name="M_wood" type="material" />
+      <surfacematerial name="M_metal" type="material" />
+      <surfacematerial name="M_default" type="material" />
+      <collection name="C_hardware" includegeom="/chair/bolts,/table/legs" excludegeom="/table/legs/foot" />
+      <collection name="C_all_hardware" includecollection="C_hardware" />
+      <look name="L_base">
+        <materialassign name="MA_all" geom="/" material="M_default" />
+      </look>
+      <look name="L_furniture" inherit="L_base">
+        <materialassign name="MA_wood" geom="/chair/seat, /table/top" material="M_wood" />
+        <materialassign name="MA_metal" collection="C_all_hardware" material="M_metal" />
+        <variantassign name="VA" variantset="finish" variant="dark" />
+      </look>
+      <variantset name="finish">
+        <variant name="dark"><input name="base_color" type="color3" value="0.1, 0.05, 0" /></variant>
+        <variant name="light"><input name="base_color" type="color3" value="0.8, 0.6, 0.4" /></variant>
+      </variantset>
+      <geominfo name="GI_chair" geom="/chair"><token name="asset" type="string" value="chair" /></geominfo>
+    </materialx>
+    """
+
+    @Test func geometryPathsMatchLikeMaterialX() {
+        #expect(GeometryPath("/a/b").matches(GeometryPath("/a/b/c")))
+        #expect(GeometryPath("/a/b/c").matches(GeometryPath("/a/b")))
+        #expect(!GeometryPath("/a/b/c").matches(GeometryPath("/a/b"), contains: true))
+        #expect(GeometryPath("/").matches(GeometryPath("/anything")))
+        #expect(!GeometryPath("").matches(GeometryPath("/a")))
+        #expect(!GeometryPath("/a/x").matches(GeometryPath("/a/b")))
+    }
+
+    @Test func materialAssignmentFollowsLooksAndCollections() throws {
+        let document = try Document(data: Data(Self.source.utf8))
+        func materials(_ geometry: String) throws -> [String] {
+            try document.materialAssignments(for: geometry, look: "L_furniture").map(\.material)
+        }
+        #expect(try materials("/chair/seat") == ["M_default", "M_wood"])
+        #expect(try materials("/chair/bolts/bolt1") == ["M_default", "M_metal"])
+        #expect(try materials("/table/legs/leg1") == ["M_default", "M_metal"])
+        #expect(try materials("/table/legs/foot") == ["M_default"])
+        #expect(try materials("/lamp") == ["M_default"])
+    }
+
+    @Test func variantsAndGeomInfo() throws {
+        let document = try Document(data: Data(Self.source.utf8))
+        let finish = try #require(try document.variantSets().first)
+        #expect(Set(finish.variants.keys) == ["dark", "light"])
+        #expect(finish.variants["dark"]?.first?.value == .numbers([0.1, 0.05, 0]))
+        #expect(document.look("L_furniture")?.variantAssigns.first?.variant == "dark")
+        #expect(document.geomInfos.first?.values["asset"]?["value"] == "chair")
+    }
+
+    @Test func collectionCyclesThrow() throws {
+        let source = """
+        <materialx version="1.39">
+          <collection name="A" includecollection="B" /><collection name="B" includecollection="A" />
+        </materialx>
+        """
+        let document = try Document(data: Data(source.utf8))
+        #expect(throws: MaterialXError.self) { try document.collection("A", contains: "/x") }
+    }
+}

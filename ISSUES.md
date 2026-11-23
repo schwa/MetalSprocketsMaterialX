@@ -115,15 +115,18 @@ closed: 2026-11-23T13:08:21Z
 ## 7: Looks, collections, geominfo and variants are not loaded
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:m, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:33:12Z
+closed: 2026-11-23T13:33:12Z
 +++
 
 <look>, <materialassign>, <collection>, <geominfo>, <propertyset> and <variantset> are skipped by Document. Material assignment by geometry name and variant selection are unavailable.
+
+- `2026-11-23T13:33:12Z`: Document.looks (with inherit), collections (GeometryCollection: includegeom/excludegeom/includecollection, cycles throw), variantSets() and variantassigns, geomInfos/propertySets. materialAssignments(for:look:) returns the assignments that apply to a geometry path, inherited looks first, using MaterialX's GeomPath matching (prefix either way; exclude requires containment; '/' universal). Which of several matching assignments wins is left to the caller. Tests: LookTests.
 
 ---
 
