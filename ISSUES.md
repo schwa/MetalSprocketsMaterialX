@@ -194,9 +194,10 @@ Types are named Element, Node, Input, Output, Value, Document in module Material
 status: open
 priority: high
 kind: feature
-labels: effort:xl, area:nodes, area:stitching
+labels: effort:xl, area:nodes, area:stitching, has-subtasks
+depends: 63, 64, 65, 66
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:32:25Z
 +++
 
 StandardLibrary.metal covers add, subtract, multiply, divide, min, max, mix, combine3 and two converts. stdlib_defs.mtlx has ~690 nodedefs. Missing math: modulo, fract, invert, absval, sign, floor, ceil, round, power, safepower, sin/cos/tan/asin/acos/atan2, sqrt, ln, exp, clamp, normalize, magnitude, distance, dotproduct, crossproduct, transformpoint/vector/normal, transformmatrix, normalmap, creatematrix, transpose, determinant, invertmatrix, rotate2d, rotate3d, reflect, refract, place2d, trianglewave, etc.
@@ -265,9 +266,10 @@ remap, smoothstep, luminance, rgbtohsv, hsvtorgb, contrast, range, hsvadjust, sa
 status: open
 priority: high
 kind: feature
-labels: effort:xl, area:nodes
+labels: effort:xl, area:nodes, has-subtasks
+depends: 67, 68, 69, 70
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:32:25Z
 +++
 
 noise2d, noise3d, fractal2d/3d, cellnoise2d/3d, worleynoise2d/3d, unifiednoise2d/3d, ramplr, ramptb, ramp4, splitlr, splittb, randomfloat, randomcolor, checkerboard, line, circle, cloverleaf, hexagon, grid, crosshatch, tiledcircles, tiledcloverleafs, tiledhexagons, bump have no implementation. MaterialX's genmsl lib (mx_noise.metal etc.) is available on disk for reference.
@@ -608,14 +610,17 @@ Found during bootstrap: MTLFunctionStitchingGraph drops input arguments that no 
 
 +++
 status: open
-priority: critical
+priority: medium
 kind: feature
-labels: effort:xl, area:pbr, area:shading
+labels: effort:xl, area:pbr, area:shading, has-subtasks
+depends: 71, 72, 73, 74
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:32:58Z
 +++
 
 The library compiles pattern graphs only. Surface shader nodes and their BSDF/EDF/VDF closures (pbrlib: oren_nayar_diffuse_bsdf, dielectric_bsdf, conductor_bsdf, generalized_schlick_bsdf, subsurface_bsdf, sheen_bsdf, thin_film_bsdf, layer, mix, add, multiply, uniform_edf, ...) have no Metal representation.
+
+- `2026-11-23T14:32:58Z`: Priority Critical→Medium: the common surface shaders already reach the PBR renderer through MXSurfaceInputs (#34, #36), and lighting comes from that renderer (#37). What remains is closure evaluation, split into the subtasks.
 
 ---
 
@@ -643,13 +648,13 @@ MetalSprocketsPBR (in SceneSprockets) shades with PBRMaterialUniforms and fixed 
 ## 35: MetalSprocketsPBR shaders have no hook for stitched material functions
 
 +++
-status: open
+status: blocked
 priority: critical
 kind: feature
 labels: effort:l, area:pbr, area:integration
 depends: 34, 42
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T14:09:30Z
+updated: 2026-11-23T14:32:58Z
 +++
 
 PBR.metal reads material values from uniforms and textures directly. There is no visible-function call site (e.g. evaluate material inputs at a surface point) that a stitched MaterialX graph could be linked into, so stitched graphs cannot drive the existing PBR renderer. The change lives in SceneSprockets.
@@ -657,6 +662,7 @@ PBR.metal reads material values from uniforms and textures directly. There is no
 - `2026-11-23T12:56:27Z`: Question 1 (decision): Add an optional [[visible]] material-evaluation call to PBR.metal in SceneSprockets (function-constant gated, so materials without MaterialX pay nothing)? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
 - `2026-11-23T14:09:30Z`: Question 2 (decision): Implement the PBR.metal hook in SceneSprockets after #42 (same blockers: publishing this package, the in-progress GBuffer work there)? Recommended: Yes
+- `2026-11-23T14:26:19Z`: Answer 2: Yes
 
 ---
 
@@ -784,12 +790,12 @@ MetalSprocketsMaterialX only exposes StitchedGraph.visibleFunction(). There is n
 ## 42: SceneSprockets uses its own MaterialX loader instead of this library
 
 +++
-status: open
+status: blocked
 priority: high
 kind: task
 labels: effort:l, area:scenesprockets, area:integration
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:32:58Z
 +++
 
 SceneSprockets has SceneSprocketsMaterialX (MaterialXDocument, its own XML parser and converter to PBRSceneMaterial, issues #528 #609 #620 there). This package duplicates the parser and aims to replace the per-pixel gaps listed in SceneSprockets #620. How the two meet (replace, wrap, or keep the CPU converter as a fallback) is undecided.
@@ -799,6 +805,7 @@ SceneSprockets has SceneSprocketsMaterialX (MaterialXDocument, its own XML parse
 - `2026-11-23T14:09:30Z`: Blocked outside this repo (2026-11-23): SceneSprockets has uncommitted work in Sources/SceneSprockets/Renderer/GBuffer.swift and Sources/SceneSprocketsShaders/Metal/GBuffer.metal, and all its dependencies are versioned GitHub URLs, so it cannot depend on this package until it is published.
 - `2026-11-23T14:09:30Z`: Question 2 (decision): May I create github.com/schwa/MetalSprocketsMaterialX, push, and tag 0.1.0, so SceneSprockets can depend on it with .upToNextMinor(from: "0.1.0") like its other packages? Recommended: Yes
 - `2026-11-23T14:09:30Z`: Question 3: Is the uncommitted GBuffer work in SceneSprockets yours/in progress, so I should wait for it to land before changing SceneSprocketsMaterialX? Recommended: Yes, wait
+- `2026-11-23T14:26:33Z`: Answer 2: Not yet
 
 ---
 
@@ -1216,5 +1223,178 @@ With Apple's nodedefs loaded (StandardLibrary.addingAppleShaderGraphNodes, #46),
 - realitykit_environment_radiance (3 uses): needs lighting (#37)
 - realitykit_image (56 nodedefs), MTL_* bitwise/integer ops, and the other ~1,400 Apple nodedefs
 The tangent-space normal input of realitykit_pbr_surfaceshader is not mapped either.
+
+---
+
+## 63: Inverse trigonometry nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:s, subtask, area:nodes
+created: 2026-11-23T14:32:25Z
++++
+
+asin, acos and atan2 (all float and vector variants) have no Metal implementation. Acceptance: every ND_asin_*, ND_acos_*, ND_atan2_* stitches and matches MaterialX's reference expressions (ReferenceImplementationTests). Part of #11.
+
+---
+
+## 64: Matrix nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:m, subtask, area:nodes
+created: 2026-11-23T14:32:25Z
++++
+
+creatematrix, transpose, determinant, invertmatrix, and the matrix33/matrix44 variants of the conditional and convert nodes have no Metal implementation. Acceptance: those nodedefs report as supported in coverage() and stitch; values checked against hand-computed matrices. Part of #11.
+
+---
+
+## 65: Space transform nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:m, subtask, area:nodes, area:geometry
+created: 2026-11-23T14:32:25Z
++++
+
+transformpoint, transformvector and transformnormal (fromspace/tospace object, world) have no implementation; MXShadingContext carries no object-to-world matrices. Acceptance: the nodes stitch and transform between object and world space using the context. Part of #11.
+
+---
+
+## 66: Texture coordinate and normal map nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:m, subtask, area:nodes, area:geometry
+created: 2026-11-23T14:32:25Z
++++
+
+rotate2d, rotate3d, place2d, normalmap and heighttonormal have no implementation, and tangent-space normal inputs (UsdPreviewSurface, realitykit_pbr_surfaceshader) are not mapped to MXSurfaceInputs. Acceptance: the nodes stitch and match MaterialX's GLSL; tangent-space normals map to a world normal. Part of #11.
+
+---
+
+## 67: Perlin noise nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:m, subtask, area:nodes
+created: 2026-11-23T14:32:25Z
++++
+
+noise2d, noise3d, fractal2d, fractal3d and cellnoise2d/3d (all variants) have no implementation. MaterialX's mx_noise GLSL/MSL is the reference. Acceptance: all variants stitch; values match the reference implementation at sample points. Part of #15.
+
+---
+
+## 68: Worley and unified noise nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:m, subtask, area:nodes
+depends: 67
+created: 2026-11-23T14:32:25Z
++++
+
+worleynoise2d/3d and unifiednoise2d/3d have no implementation. Acceptance: all variants stitch and match the reference at sample points. Part of #15.
+
+---
+
+## 69: Ramp and split nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:s, subtask, area:nodes
+created: 2026-11-23T14:32:25Z
++++
+
+ramplr, ramptb, ramp4, ramp, splitlr and splittb (all variants) do not stitch. Acceptance: all variants report supported in coverage() and produce the expected values at UV corners/edges. Part of #15.
+
+---
+
+## 70: Random nodes are missing
+
++++
+status: open
+priority: high
+kind: feature
+labels: effort:s, subtask, area:nodes
+depends: 67
+created: 2026-11-23T14:32:25Z
++++
+
+randomfloat and randomcolor have no implementation. Acceptance: both stitch, are deterministic for a seed, and match MaterialX's hashing. Part of #15.
+
+---
+
+## 71: No stitching representation for BSDF, EDF and VDF closures
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:m, subtask, area:pbr, area:shading
+created: 2026-11-23T14:32:25Z
++++
+
+bsdf, edf and vdf typed values (pbrlib closures) cannot be passed between stitched functions. Acceptance: a closure representation exists that closure nodes can produce and consume, and a minimal closure graph stitches. Part of #33.
+
+---
+
+## 72: pbrlib BSDF nodes are missing
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:m, subtask, area:pbr, area:shading
+depends: 71
+created: 2026-11-23T14:32:25Z
++++
+
+oren_nayar_diffuse_bsdf, dielectric_bsdf, conductor_bsdf, generalized_schlick_bsdf, sheen_bsdf, subsurface_bsdf, translucent_bsdf and thin_film_bsdf have no implementation. Acceptance: each stitches on the closure representation. Part of #33.
+
+---
+
+## 73: Closure combinator nodes are missing
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:s, subtask, area:pbr, area:shading
+depends: 71
+created: 2026-11-23T14:32:25Z
++++
+
+layer, mix, add and multiply for bsdf/edf/vdf, uniform_edf and measured_edf have no implementation. Acceptance: each stitches on the closure representation. Part of #33.
+
+---
+
+## 74: Shader and material nodes on closures are missing
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:m, subtask, area:pbr, area:shading
+depends: 72, 73
+created: 2026-11-23T14:32:25Z
++++
+
+surface, surfacematerial, volume, volumematerial and the lama_* shaders have no implementation. Acceptance: a lama surface graph stitches end to end. Part of #33.
 
 ---
