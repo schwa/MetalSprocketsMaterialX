@@ -61,11 +61,11 @@ private final class ParserDelegate: NSObject, XMLParserDelegate {
     var stack: [Element] = []
     var root: Element?
 
-    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String] = [:]) {
+    func parser(_: XMLParser, didStartElement elementName: String, namespaceURI _: String?, qualifiedName _: String?, attributes: [String: String] = [:]) {
         stack.append(Element(tag: elementName, attributes: attributes))
     }
 
-    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName: String?) {
+    func parser(_: XMLParser, didEndElement _: String, namespaceURI _: String?, qualifiedName _: String?) {
         let element = stack.removeLast()
         if stack.isEmpty {
             root = element

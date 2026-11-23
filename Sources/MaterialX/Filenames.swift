@@ -42,7 +42,7 @@ public struct FilenamePattern: Hashable, Sendable {
     /// `<UDIM>` becomes `1001 + u + 10 v`; `<UVTILE>` becomes `u<u+1>_v<v+1>`.
     public func filename(u: Int, v: Int) -> String {
         pattern
-            .replacingOccurrences(of: "<UDIM>", with: String(1001 + u + 10 * v))
+            .replacingOccurrences(of: "<UDIM>", with: String(1_001 + u + 10 * v))
             .replacingOccurrences(of: "<UVTILE>", with: "u\(u + 1)_v\(v + 1)")
     }
 }

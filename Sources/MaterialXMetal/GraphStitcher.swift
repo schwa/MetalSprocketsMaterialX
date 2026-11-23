@@ -138,7 +138,7 @@ public struct GraphStitcher {
             throw MaterialXError.invalidDocument("output '\(output.name)' is not connected")
         }
         var builder = Builder(stitcher: self)
-        let scope = Builder.Scope(graph: graph, prefix: "", bindings: nil, colorSpace: graph.element["colorspace"] ?? documentColorSpace)
+        let scope = Builder.Scope(graph: graph, prefix: "", bindings: [:], colorSpace: graph.element["colorspace"] ?? documentColorSpace)
         let value = try builder.resolve(nodeName: nodeName, output: output.output, in: scope)
         let outputNode = try builder.call("mx_output_" + output.type.metalSuffix(), [value, builder.texcoord, builder.parametersArgument])
         let key = functionName + "\n" + builder.topology.joined(separator: "\n")
@@ -163,7 +163,8 @@ private struct Builder {
     struct Scope {
         var graph: NodeGraph
         var prefix: String
-        var bindings: [String: MTLFunctionStitchingNode]?
+        /// Interface inputs bound to the calling node's arguments. Unbound ones become parameters.
+        var bindings: [String: MTLFunctionStitchingNode]
         /// The inherited colorspace for color values. `nil` inside functional nodegraphs, whose constants are raw.
         var colorSpace: String?
     }
@@ -284,7 +285,7 @@ private struct Builder {
             return try resolve(nodeName: upstream, output: input?.output, in: scope)
         }
         if let interfaceName = input?.interfaceName {
-            if let bound = scope.bindings?[interfaceName] {
+            if let bound = scope.bindings[interfaceName] {
                 return bound
             }
             let key = scope.prefix + interfaceName

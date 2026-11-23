@@ -50,7 +50,7 @@ struct ReferenceImplementationTests {
             guard let count = input.type.componentCount, count <= 4 else { return nil }
             let numbers = (0..<count).map { 0.6 + 0.35 * Float(index) + 0.15 * Float($0) }
             let list = numbers.map { String($0) }.joined(separator: ", ")
-            return (list, "\(metalTypes[input.type]!)(\(list))")
+            return (list, "\(metalTypes[input.type, default: "float"])(\(list))")
         }
     }
 
@@ -74,10 +74,10 @@ struct ReferenceImplementationTests {
         var declarations = ""
         for (index, input) in testCase.nodeDef.inputs.enumerated() {
             let value = try #require(Self.value(for: input, index: index))
-            declarations += "    \(Self.metalTypes[input.type]!) v_\(input.name) = \(value.metal);\n"
+            declarations += "    \(try #require(Self.metalTypes[input.type])) v_\(input.name) = \(value.metal);\n"
             expression = expression.replacingOccurrences(of: "{{\(input.name)}}", with: "v_\(input.name)")
         }
-        let outputType = Self.metalTypes[testCase.nodeDef.outputs[0].type]!
+        let outputType = try #require(Self.metalTypes[testCase.nodeDef.outputs[0].type])
         let source = Self.prelude + """
         kernel void reference(device float4 *out [[buffer(0)]]) {
         \(declarations)    \(outputType) result = \(expression);
@@ -102,10 +102,11 @@ struct ReferenceImplementationTests {
     func stitched(_ testCase: Case, stitcher: GraphStitcher, device: MTLDevice) throws -> SIMD4<Float> {
         let nodeDef = testCase.nodeDef
         let outputType = nodeDef.outputs[0].type
-        let inputs = try nodeDef.inputs.enumerated().map { index, input in
+        let inputElements = try nodeDef.inputs.enumerated().map { index, input in
             let value = try #require(Self.value(for: input, index: index))
             return "<input name=\"\(input.name)\" type=\"\(input.type)\" value=\"\(value.xml)\" />"
-        }.joined()
+        }
+        let inputs = inputElements.joined()
         let xml = """
         <materialx version="1.39"><nodegraph name="g">
           <\(nodeDef.node) name="n" type="\(outputType)" nodedef="\(nodeDef.name)">\(inputs)</\(nodeDef.node)>

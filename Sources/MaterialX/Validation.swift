@@ -21,7 +21,7 @@ public extension Document {
             issues += validate(nodes: graph.nodes, graph: graph, scope: graph.name, library: merged)
             for output in graph.outputs {
                 guard let nodeName = output.nodeName else { continue }
-                issues += checkConnection(path: "\(graph.name)/\(output.name)", type: output.type, nodeName: nodeName, output: output.output, nodes: graph.nodes, library: merged)
+                issues += checkConnection(path: "\(graph.name)/\(output.name)", type: output.type, upstream: (nodeName, output.output), nodes: graph.nodes, library: merged)
             }
         }
         let topLevel = Dictionary(nodes.map { ($0.name, $0) }) { first, _ in first }
@@ -39,7 +39,7 @@ public extension Document {
             for input in node.inputs {
                 let path = "\(nodePath).\(input.name)"
                 if let nodeName = input.nodeName {
-                    issues += checkConnection(path: path, type: input.type, nodeName: nodeName, output: input.output, nodes: nodes, library: library)
+                    issues += checkConnection(path: path, type: input.type, upstream: (nodeName, input.output), nodes: nodes, library: library)
                 }
                 if let interfaceName = input.interfaceName {
                     if let graph {
@@ -73,7 +73,8 @@ public extension Document {
         return issues
     }
 
-    private func checkConnection(path: String, type: ValueType, nodeName: String, output: String?, nodes: [String: Node], library: StandardLibrary) -> [ValidationIssue] {
+    private func checkConnection(path: String, type: ValueType, upstream connection: (nodeName: String, output: String?), nodes: [String: Node], library: StandardLibrary) -> [ValidationIssue] {
+        let (nodeName, output) = connection
         guard let upstream = nodes[nodeName] else {
             return [.init(path: path, message: "node '\(nodeName)' does not exist")]
         }

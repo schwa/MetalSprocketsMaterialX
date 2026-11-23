@@ -1,0 +1,8 @@
+[defaults]
+skip_plugin_validation = true
+
+[defaults.build]
+scheme = "MetalSprocketsMaterialX-Package"
+
+[defaults.test]
+scheme = "MetalSprocketsMaterialX-Package"

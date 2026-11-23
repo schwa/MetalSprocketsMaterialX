@@ -847,15 +847,18 @@ Sources/MaterialX/Resources/libraries was copied from RealityComposerPro.app's S
 ## 51: No SwiftLint config, CI or .xcb.toml
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:s, area:build
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:19:21Z
+closed: 2026-11-23T13:19:21Z
 +++
 
 The package has no .swiftlint.yml, no GitHub Actions / Buildkite config and no .xcb.toml, unlike the sibling packages.
+
+- `2026-11-23T13:19:21Z`: Added .swiftlint.yml (sibling packages' curated strict config; multiline strings excluded from indentation_width for test XML) with all violations fixed, .xcb.toml, and .github/workflows/swift.yml from 'xcb ci generate' (swiftlint, macOS build+test with warnings as errors, iOS and visionOS xcodebuild builds — which also covers #52 once CI runs).
 
 ---
 

@@ -78,8 +78,8 @@ public enum Value: Hashable, Sendable {
         self = .numbers(numbers)
     }
 
-    /// The value as floats; integers and booleans become one float.
-    public var numbers: [Float]? {
+    /// The value as floats; integers and booleans become one float. `nil` for strings, which have no numbers.
+    public var numbers: [Float]? { // swiftlint:disable:this discouraged_optional_collection
         switch self {
         case let .numbers(values): values
         case let .integer(value): [Float(value)]
