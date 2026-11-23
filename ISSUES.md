@@ -417,6 +417,8 @@ updated: 2026-11-23T12:55:47Z
 
 Every parameter takes one float4 slot, including floats. parameterData is [SIMD4<Float>] indexed by slot number; there is no typed setter by name (e.g. set("tint", to: SIMD3)) and no validation of type on write.
 
+- `2026-11-23T13:30:08Z`: Question 1 (decision): Leave the one-float4-slot-per-parameter layout as is (simple readers, 16 B per scalar; a 50-input material is under 1 KB) and close #24 with the typed setters, instead of packing scalars into shared slots? Recommended: Yes, keep the layout
+
 ---
 
 ## 25: Multi-output nodes and nodegraph outputs are not supported
