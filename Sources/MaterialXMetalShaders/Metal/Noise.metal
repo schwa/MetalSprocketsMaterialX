@@ -240,6 +240,114 @@ template <typename P> static float2 mx_fractal_value(P p, int o, float l, float 
 template <typename P> static float3 mx_fractal_value(P p, int o, float l, float d, float3) { return mx_fractal_noise_vec3(p, o, l, d); }
 template <typename P> static float4 mx_fractal_value(P p, int o, float l, float d, float4) { return mx_fractal_noise_vec4(p, o, l, d); }
 
+// MARK: Worley
+
+static float2 mx_worley_cell_position(int x, int y, int xoff, int yoff, float jitter) {
+    float3 tmp = mx_cell_noise_vec3(float2(x + xoff, y + yoff));
+    float2 off = tmp.xy;
+    off -= 0.5;
+    off *= jitter;
+    off += 0.5;
+    return float2(float(x), float(y)) + off;
+}
+
+static float3 mx_worley_cell_position(int x, int y, int z, int xoff, int yoff, int zoff, float jitter) {
+    float3 off = mx_cell_noise_vec3(float3(x + xoff, y + yoff, z + zoff));
+    off -= 0.5;
+    off *= jitter;
+    off += 0.5;
+    return float3(float(x), float(y), float(z)) + off;
+}
+
+static float mx_worley_distance(float2 p, int x, int y, int xoff, int yoff, float jitter, int metric) {
+    float2 diff = mx_worley_cell_position(x, y, xoff, yoff, jitter) - p;
+    if (metric == 2) { return abs(diff.x) + abs(diff.y); }
+    if (metric == 3) { return max(abs(diff.x), abs(diff.y)); }
+    return dot(diff, diff);
+}
+
+static float mx_worley_distance(float3 p, int x, int y, int z, int xoff, int yoff, int zoff, float jitter, int metric) {
+    float3 diff = mx_worley_cell_position(x, y, z, xoff, yoff, zoff, jitter) - p;
+    if (metric == 2) { return abs(diff.x) + abs(diff.y) + abs(diff.z); }
+    if (metric == 3) { return max(max(abs(diff.x), abs(diff.y)), abs(diff.z)); }
+    return dot(diff, diff);
+}
+
+// The three nearest squared distances (or metric distances) and the nearest cell, as MaterialX's
+// mx_worley_noise_{float,vec2,vec3} each track a prefix of them.
+struct MXWorleyResult {
+    float3 distances;
+    float3 nearest;
+};
+
+static void mx_worley_insert(thread MXWorleyResult &result, float dist, float3 cell) {
+    if (dist < result.distances.x) {
+        result.distances.z = result.distances.y;
+        result.distances.y = result.distances.x;
+        result.distances.x = dist;
+        result.nearest = cell;
+    } else if (dist < result.distances.y) {
+        result.distances.z = result.distances.y;
+        result.distances.y = dist;
+    } else if (dist < result.distances.z) {
+        result.distances.z = dist;
+    }
+}
+
+static MXWorleyResult mx_worley_search(float2 p, float jitter, int metric) {
+    int X, Y;
+    float2 localpos = float2(mx_floorfrac(p.x, X), mx_floorfrac(p.y, Y));
+    MXWorleyResult result = { float3(1e6), float3(0) };
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float dist = mx_worley_distance(localpos, x, y, X, Y, jitter, metric);
+            float2 cell = mx_worley_cell_position(x, y, X, Y, jitter) - localpos;
+            mx_worley_insert(result, dist, float3(cell, 0));
+        }
+    }
+    return result;
+}
+
+static MXWorleyResult mx_worley_search(float3 p, float jitter, int metric) {
+    int X, Y, Z;
+    float3 localpos = float3(mx_floorfrac(p.x, X), mx_floorfrac(p.y, Y), mx_floorfrac(p.z, Z));
+    MXWorleyResult result = { float3(1e6), float3(0) };
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            for (int z = -1; z <= 1; ++z) {
+                float dist = mx_worley_distance(localpos, x, y, z, X, Y, Z, jitter, metric);
+                float3 cell = mx_worley_cell_position(x, y, z, X, Y, Z, jitter) - localpos;
+                mx_worley_insert(result, dist, cell);
+            }
+        }
+    }
+    return result;
+}
+
+static float2 mx_worley_cell(float2 p, float3 nearest) { return nearest.xy + p; }
+static float3 mx_worley_cell(float3 p, float3 nearest) { return nearest + p; }
+
+// style 1 (Solid): a random value for the nearest cell. style 0 (Distance): the distances, square-rooted for the
+// Euclidean metric (0).
+template <typename P>
+static float mx_worley_noise_float(P p, float jitter, int style, int metric) {
+    MXWorleyResult result = mx_worley_search(p, jitter, metric);
+    if (style == 1) { return mx_cell_noise_float(mx_worley_cell(p, result.nearest)); }
+    return metric == 0 ? sqrt(result.distances.x) : result.distances.x;
+}
+template <typename P>
+static float2 mx_worley_noise_vec2(P p, float jitter, int style, int metric) {
+    MXWorleyResult result = mx_worley_search(p, jitter, metric);
+    if (style == 1) { return mx_cell_noise_vec3(mx_worley_cell(p, result.nearest)).xy; }
+    return metric == 0 ? sqrt(result.distances.xy) : result.distances.xy;
+}
+template <typename P>
+static float3 mx_worley_noise_vec3(P p, float jitter, int style, int metric) {
+    MXWorleyResult result = mx_worley_search(p, jitter, metric);
+    if (style == 1) { return mx_cell_noise_vec3(mx_worley_cell(p, result.nearest)); }
+    return metric == 0 ? sqrt(result.distances) : result.distances;
+}
+
 // MARK: Nodes
 
 #define MX_NOISE(DIMENSION, P, COORDINATE, SUFFIX, T, A) \
@@ -265,6 +373,13 @@ template <typename P> static float4 mx_fractal_value(P p, int o, float l, float 
 
 MX_NOISE_TYPES(2d, float2, texcoord)
 MX_NOISE_TYPES(3d, float3, position)
+
+#define MX_WORLEY(DIMENSION, P, COORDINATE) \
+    [[stitchable]] float mx_worleynoise##DIMENSION##_float(P COORDINATE, float jitter, int style) { return mx_worley_noise_float(COORDINATE, jitter, style, 0); } \
+    [[stitchable]] float2 mx_worleynoise##DIMENSION##_vector2(P COORDINATE, float jitter, int style) { return mx_worley_noise_vec2(COORDINATE, jitter, style, 0); } \
+    [[stitchable]] float3 mx_worleynoise##DIMENSION##_vector3(P COORDINATE, float jitter, int style) { return mx_worley_noise_vec3(COORDINATE, jitter, style, 0); }
+MX_WORLEY(2d, float2, texcoord)
+MX_WORLEY(3d, float3, position)
 
 [[stitchable]] float mx_cellnoise2d_float(float2 texcoord) { return mx_cell_noise_float(texcoord); }
 [[stitchable]] float mx_cellnoise3d_float(float3 position) { return mx_cell_noise_float(position); }

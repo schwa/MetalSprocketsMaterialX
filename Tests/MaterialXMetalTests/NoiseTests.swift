@@ -140,3 +140,64 @@ struct RandomNodeTests {
         }
     }
 }
+
+extension ReferenceNoise {
+    static func hash(_ x: Int32, _ y: Int32, _ z: Int32) -> UInt32 {
+        let seed = 0xdead_beef &+ (3 << 2) &+ 13 as UInt32
+        return bjfinal(seed &+ UInt32(bitPattern: x), seed &+ UInt32(bitPattern: y), seed &+ UInt32(bitPattern: z))
+    }
+
+    static func bits(_ value: UInt32) -> Float { Float(value) / Float(UInt32.max) }
+
+    /// MaterialX's mx_worley_noise_float/vec2 for 2D points, Euclidean, distance style.
+    static func worley(_ p: SIMD2<Float>, jitter: Float) -> SIMD2<Float> {
+        let cellX = Int32(p.x.rounded(.down)), cellY = Int32(p.y.rounded(.down))
+        let local = SIMD2(p.x - Float(cellX), p.y - Float(cellY))
+        var nearest = SIMD2<Float>(1e6, 1e6)
+        for x in Int32(-1)...1 {
+            for y in Int32(-1)...1 {
+                let ix = x + cellX, iy = y + cellY
+                var offset = SIMD2(bits(hash(ix, iy, 0)), bits(hash(ix, iy, 1)))
+                offset = (offset - 0.5) * jitter + 0.5
+                let diff = SIMD2(Float(x), Float(y)) + offset - local
+                let distance = simd_dot(diff, diff)
+                if distance < nearest.x {
+                    nearest = SIMD2(distance, nearest.x)
+                } else if distance < nearest.y {
+                    nearest.y = distance
+                }
+            }
+        }
+        return nearest.squareRoot()
+    }
+}
+
+/// #68: Worley and unified noise.
+@Suite(.serialized)
+struct WorleyNoiseTests {
+    @Test func worleyDistancesMatchTheReference() throws {
+        let values = try NoiseTests().evaluate("<worleynoise2d name=\"n\" type=\"vector2\"><input name=\"jitter\" type=\"float\" value=\"0.8\" /></worleynoise2d>", type: "vector2")
+        for (value, sample) in zip(values, NoiseTests.samples) {
+            let expected = ReferenceNoise.worley(sample, jitter: 0.8)
+            #expect(simd_distance(SIMD2(value.x, value.y), expected) < 1e-5, "\(sample): \(value) vs \(expected)")
+        }
+    }
+
+    @Test func solidStyleIsConstantInsideACell() throws {
+        // Two points close together usually share the nearest feature point, so the solid value repeats.
+        let node = "<worleynoise2d name=\"n\" type=\"float\"><input name=\"jitter\" type=\"float\" value=\"0\" /><input name=\"style\" type=\"integer\" value=\"1\" /></worleynoise2d>"
+        // With zero jitter every feature point is a cell center, so points near (2.5, 3.5) share it.
+        let values = try NoiseTests().evaluate(node, at: [[2.45, 3.5], [2.55, 3.52]]).map(\.x)
+        #expect(values[0] == values[1])
+        #expect((0...1).contains(values[0]))
+    }
+
+    @Test func everyWorleyAndUnifiedNodeDefIsSupported() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let coverage = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device)).coverage()
+        let names = StandardLibrary.shared.nodeDefs.keys.filter { $0.hasPrefix("ND_worleynoise") || $0.hasPrefix("ND_unifiednoise") }
+        #expect(names.count == 8)
+        let missing = names.filter { coverage[$0] == .unsupported }.sorted()
+        #expect(missing.isEmpty, "\(missing)")
+    }
+}

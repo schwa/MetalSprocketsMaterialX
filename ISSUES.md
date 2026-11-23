@@ -1319,15 +1319,19 @@ noise2d, noise3d, fractal2d, fractal3d and cellnoise2d/3d (all variants) have no
 ## 68: Worley and unified noise nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, subtask, area:nodes
 depends: 67
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:46:13Z
+closed: 2026-11-23T14:46:13Z
 +++
 
 worleynoise2d/3d and unifiednoise2d/3d have no implementation. Acceptance: all variants stitch and match the reference at sample points. Part of #15.
+
+- `2026-11-23T14:46:13Z`: Ported MaterialX's Worley functions (cell positions, distance metrics, nearest-3 search, solid/distance styles) into Noise.metal and added worleynoise2d/3d (float, vector2, vector3); unifiednoise2d/3d stitch through their nodegraphs (Perlin/cell/Worley/fractal). WorleyNoiseTests compares worleynoise2d vector2 distances against a Swift transcription of MaterialX's algorithm (1e-5) and checks solid style; all 8 nodedefs supported.
 
 ---
 

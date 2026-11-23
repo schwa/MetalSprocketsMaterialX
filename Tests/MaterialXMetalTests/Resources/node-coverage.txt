@@ -692,5 +692,13 @@ ND_triplanarprojection_float nodeGraph
 ND_triplanarprojection_vector2 nodeGraph
 ND_triplanarprojection_vector3 nodeGraph
 ND_triplanarprojection_vector4 nodeGraph
+ND_unifiednoise2d_float nodeGraph
+ND_unifiednoise3d_float nodeGraph
 ND_unpremult_color4 metal
 ND_viewdirection_vector3 metal
+ND_worleynoise2d_float metal
+ND_worleynoise2d_vector2 metal
+ND_worleynoise2d_vector3 metal
+ND_worleynoise3d_float metal
+ND_worleynoise3d_vector2 metal
+ND_worleynoise3d_vector3 metal
