@@ -258,3 +258,49 @@ struct StitchCacheTests {
         #expect(nodeLibrary.stitchCount == 2)
     }
 }
+
+/// #13: conditional and logical nodes.
+@Suite(.serialized)
+struct ConditionalNodeTests {
+    @Test func everyNonMatrixConditionalNodeDefHasAMetalFunction() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let nodeLibrary = try MetalNodeLibrary(device: device)
+        let categories: Set<String> = ["ifgreater", "ifgreatereq", "ifequal", "and", "or", "not"]
+        let nodeDefs = StandardLibrary.shared.nodeDefs.values.filter { nodeDef in
+            categories.contains(nodeDef.node) && !nodeDef.name.contains("matrix")
+        }
+        #expect(nodeDefs.count > 50)
+        let missing = nodeDefs.map(MetalNodeLibrary.functionName).filter { !nodeLibrary.hasFunction(named: $0) }.sorted()
+        #expect(missing.isEmpty, "\(missing)")
+    }
+
+    func evaluate(_ body: String, type: String) throws -> SIMD4<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        return try StitchingTests().evaluate(stitched, device: device, returnType: type)[0]
+    }
+
+    @Test func switchPicksInputByWhich() throws {
+        let value = try evaluate("""
+        <switch name="n" type="color3">
+          <input name="in1" type="color3" value="1, 0, 0" /><input name="in2" type="color3" value="0, 1, 0" />
+          <input name="in3" type="color3" value="0, 0, 1" /><input name="which" type="float" value="2" />
+        </switch>
+        """, type: "color3")
+        #expect(value == [0, 0, 1, 1])
+    }
+
+    @Test func xorAndIfequalBoolean() throws {
+        // ifequal(xor(true, false), true) ? 1 : 0
+        let value = try evaluate("""
+        <xor name="x" type="boolean"><input name="in1" type="boolean" value="true" /><input name="in2" type="boolean" value="false" /></xor>
+        <ifequal name="n" type="float">
+          <input name="value1" type="boolean" nodename="x" /><input name="value2" type="boolean" value="true" />
+          <input name="in1" type="float" value="1" /><input name="in2" type="float" value="0" />
+        </ifequal>
+        """, type: "float")
+        #expect(value.x == 1)
+    }
+}

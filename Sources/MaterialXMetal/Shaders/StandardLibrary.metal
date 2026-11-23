@@ -24,6 +24,8 @@ using namespace metal;
 [[stitchable]] float2 mx_output_vector2(float2 value, float2, constant float4 *) { return value; }
 [[stitchable]] float3 mx_output_vector3(float3 value, float2, constant float4 *) { return value; }
 [[stitchable]] float4 mx_output_vector4(float4 value, float2, constant float4 *) { return value; }
+[[stitchable]] int mx_output_integer(int value, float2, constant float4 *) { return value; }
+[[stitchable]] bool mx_output_boolean(bool value, float2, constant float4 *) { return value; }
 
 // MARK: Procedural
 
@@ -79,6 +81,45 @@ MX_MIX(vector3_vector3, float3, float3)
 MX_MIX(vector4_vector4, float4, float4)
 MX_MIX(color3_color3, float3, float3)
 MX_MIX(color4_color4, float4, float4)
+
+// MARK: Conditional
+// Suffix-free nodedefs compare floats, `I` integers, `B` booleans. switch and logical_xor are functional nodegraphs
+// built from these.
+
+#define MX_IF(NAME, OP, SUFFIX, T, V) \
+    [[stitchable]] T mx_##NAME##_##SUFFIX(V value1, V value2, T in1, T in2) { return value1 OP value2 ? in1 : in2; }
+
+#define MX_IF_TYPES(NAME, OP, VARIANT, V) \
+    MX_IF(NAME, OP, float##VARIANT, float, V) \
+    MX_IF(NAME, OP, integer##VARIANT, int, V) \
+    MX_IF(NAME, OP, color3##VARIANT, float3, V) \
+    MX_IF(NAME, OP, color4##VARIANT, float4, V) \
+    MX_IF(NAME, OP, vector2##VARIANT, float2, V) \
+    MX_IF(NAME, OP, vector3##VARIANT, float3, V) \
+    MX_IF(NAME, OP, vector4##VARIANT, float4, V)
+
+MX_IF_TYPES(ifgreater, >, , float)
+MX_IF_TYPES(ifgreater, >, I, int)
+MX_IF_TYPES(ifgreatereq, >=, , float)
+MX_IF_TYPES(ifgreatereq, >=, I, int)
+MX_IF_TYPES(ifequal, ==, , float)
+MX_IF_TYPES(ifequal, ==, I, int)
+MX_IF_TYPES(ifequal, ==, B, bool)
+
+#define MX_COMPARE(NAME, OP, SUFFIX, V) \
+    [[stitchable]] bool mx_##NAME##_##SUFFIX(V value1, V value2) { return value1 OP value2; }
+
+MX_COMPARE(ifgreater, >, boolean, float)
+MX_COMPARE(ifgreater, >, booleanI, int)
+MX_COMPARE(ifgreatereq, >=, boolean, float)
+MX_COMPARE(ifgreatereq, >=, booleanI, int)
+MX_COMPARE(ifequal, ==, boolean, float)
+MX_COMPARE(ifequal, ==, booleanI, int)
+MX_COMPARE(ifequal, ==, booleanB, bool)
+
+[[stitchable]] bool mx_logical_and(bool in1, bool in2) { return in1 && in2; }
+[[stitchable]] bool mx_logical_or(bool in1, bool in2) { return in1 || in2; }
+[[stitchable]] bool mx_logical_not(bool in) { return !in; }
 
 // MARK: Channel
 

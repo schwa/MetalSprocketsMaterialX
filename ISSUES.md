@@ -208,15 +208,18 @@ extract, separate2/3/4, combine2/4, swizzle (1.38 compat), convert for all type 
 ## 13: Logical and conditional nodes are missing
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:m, area:nodes
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:09:57Z
+closed: 2026-11-23T13:09:57Z
 +++
 
 ifgreater, ifgreatereq, ifequal, switch, and/or/not/xor (1.39 boolean nodes) have no implementation. Boolean and integer inputs also have no parameter readers.
+
+- `2026-11-23T13:09:57Z`: Metal functions for ifgreater/ifgreatereq/ifequal (float, I and B variants, boolean outputs), and/or/not; switch and xor stitch through their stdlib nodegraphs. Boolean/integer graph outputs supported. Matrix variants wait on matrix parameter support. Reference-expression test covers the non-boolean if* nodes. Tests: ConditionalNodeTests.
 
 ---
 
