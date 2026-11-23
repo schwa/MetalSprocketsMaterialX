@@ -182,6 +182,7 @@ Types are named Element, Node, Input, Output, Value, Document in module Material
 - `2026-11-23T13:19:31Z`: Question 1 (design): Rename the MaterialX module's generic types with a MaterialX prefix (MaterialXDocument, MaterialXNode, MaterialXInput, MaterialXOutput, MaterialXValue, MaterialXElement; NodeDef/NodeGraph/TypeDef keep their names) so they do not clash with SceneSprockets' Node etc.? Recommended: Yes
 - `2026-11-23T13:39:37Z`: I'd rather not :-(
 - `2026-11-23T13:39:45Z`: Answer 1: I'd rather not :-(
+- `2026-11-23T13:56:21Z`: Confirmed in practice: MaterialX.Element collides with MetalSprockets.Element. MaterialXUnlitSurface (#41) has to spell out MetalSprockets.Element.
 
 ---
 
@@ -745,19 +746,21 @@ cmlib_defs.mtlx / cmlib_ng.mtlx colorspace transforms (srgb_texture_to_lin_rec70
 ## 41: No MetalSprockets element for rendering with a MaterialX material
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:l, area:metalsprockets, area:integration
 depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:03:00Z
+updated: 2026-11-23T13:56:21Z
+closed: 2026-11-23T13:56:21Z
 +++
 
 MetalSprocketsMaterialX only exposes StitchedGraph.visibleFunction(). There is no Element or modifier that binds the parameter buffer, links the stitched function into a RenderPipeline, and updates parameters per frame.
 
 - `2026-11-23T13:03:00Z`: Question 1 (design): Should the first MetalSprockets element be an unlit MaterialXSurface modifier (fragment shader calls the stitched base-color function, binds the parameter buffer, re-stitches only on topology change), with the lit PBR path waiting on #34/#35? Recommended: Yes, unlit first
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T13:56:21Z`: MaterialXUnlitSurface(graph:uniforms:textures:) { Draw … } (MetalSprocketsMaterialX), per #41-Q1: unlit first. A RenderPipeline with mx_unlit_vertex and mx_unlit_fragment_color3/color4 (Unlit.metal in MaterialXMetalShaders) that fills MXShadingContext (position, normal, a tangent frame from the normal, view direction, UV, time, frame from MXUnlitUniforms) and calls the graph through a visible function table; binds uniforms, parameterData, the MXTexture table and makes textures resident. Vertex layout: interleaved float3 position, float3 normal, float2 uv (vertexDescriptor). Parameters are read each frame; re-stitching unchanged wiring reuses the cached library. Lit PBR is #34/#35. Test: UnlitSurfaceTests (offscreen render, color by UV, parameter edit shows up).
 
 ---
 

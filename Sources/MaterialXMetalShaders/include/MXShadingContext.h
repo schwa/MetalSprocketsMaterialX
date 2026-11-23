@@ -13,11 +13,15 @@
 typedef metal::float2 MXFloat2;
 typedef metal::float3 MXFloat3;
 typedef metal::float4 MXFloat4;
+typedef metal::float3x3 MXFloat3x3;
+typedef metal::float4x4 MXFloat4x4;
 #else
 #include <simd/simd.h>
 typedef simd_float2 MXFloat2;
 typedef simd_float3 MXFloat3;
 typedef simd_float4 MXFloat4;
+typedef simd_float3x3 MXFloat3x3;
+typedef simd_float4x4 MXFloat4x4;
 #endif
 
 typedef struct MXShadingContext {
@@ -39,6 +43,17 @@ typedef struct MXShadingContext {
     float time;
     float frame;
 } MXShadingContext;
+
+// Per-draw values for the unlit MaterialX pipeline (MaterialXUnlitSurface).
+typedef struct MXUnlitUniforms {
+    MXFloat4x4 modelViewProjection;
+    MXFloat4x4 model;
+    /// Inverse transpose of the model matrix's upper 3×3.
+    MXFloat3x3 normalMatrix;
+    MXFloat3 cameraPosition;
+    float time;
+    float frame;
+} MXUnlitUniforms;
 
 // One texture slot. In Swift, write the texture's and sampler's gpuResourceID (the sampler needs
 // supportArgumentBuffers).

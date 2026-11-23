@@ -59,7 +59,12 @@ let package = Package(
         .testTarget(name: "MaterialXTests", dependencies: ["MaterialX"]),
         .testTarget(
             name: "MaterialXMetalTests",
-            dependencies: ["MaterialX", "MaterialXMetal", "MetalSprocketsMaterialX"],
+            dependencies: [
+                "MaterialX",
+                "MaterialXMetal",
+                "MetalSprocketsMaterialX",
+                .product(name: "MetalSprockets", package: "MetalSprockets"),
+            ],
             // node-coverage.txt is read from the source tree, so it can be regenerated in place.
             exclude: ["Resources/node-coverage.txt"],
             resources: [.copy("Resources/stdlib_genglsl_impl.mtlx"), .copy("Resources/Corpus")]
