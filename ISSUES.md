@@ -173,6 +173,8 @@ updated: 2026-11-23T12:55:47Z
 
 Types are named Element, Node, Input, Output, Value, Document in module MaterialX. They clash easily with other modules imported by SceneSprockets and MetalSprockets (e.g. Node in SceneSprockets). Naming, Sendable, Codable and mutability were picked quickly during bootstrap.
 
+- `2026-11-23T13:19:31Z`: Question 1 (design): Rename the MaterialX module's generic types with a MaterialX prefix (MaterialXDocument, MaterialXNode, MaterialXInput, MaterialXOutput, MaterialXValue, MaterialXElement; NodeDef/NodeGraph/TypeDef keep their names) so they do not clash with SceneSprockets' Node etc.? Recommended: Yes
+
 ---
 
 ## 11: Most stdlib math nodes have no Metal implementation
