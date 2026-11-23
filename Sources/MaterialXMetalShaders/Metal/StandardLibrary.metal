@@ -243,6 +243,61 @@ MX_UNARY(dot, in)
     return float2(roughnessSquared);
 }
 
+[[stitchable]] float3 mx_crossproduct_vector3(float3 in1, float3 in2) { return cross(in1, in2); }
+
+#define MX_SAFEPOWER(SUFFIX, T, U) \
+    [[stitchable]] T mx_safepower_##SUFFIX(T in1, U in2) { return sign(in1) * pow(abs(in1), T(in2)); }
+MX_SAFEPOWER(float, float, float)
+MX_SAFEPOWER(vector2, float2, float2)
+MX_SAFEPOWER(vector3, float3, float3)
+MX_SAFEPOWER(vector4, float4, float4)
+MX_SAFEPOWER(color3, float3, float3)
+MX_SAFEPOWER(color4, float4, float4)
+MX_SAFEPOWER(vector2FA, float2, float)
+MX_SAFEPOWER(vector3FA, float3, float)
+MX_SAFEPOWER(vector4FA, float4, float)
+MX_SAFEPOWER(color3FA, float3, float)
+MX_SAFEPOWER(color4FA, float4, float)
+
+// MARK: swizzle (MaterialX 1.38, used by RealityKit documents)
+// The stitcher turns `channels` ("rgb", "xxy1", …) into a vector4 of indices: 0–3 for a component, -1 for '0', -2
+// for '1'.
+
+static float mx_channel(float4 v, float index) {
+    return index >= 0 ? v[int(index)] : (index < -1.5 ? 1.0 : 0.0);
+}
+static float4 mx_widen4(float v) { return float4(v, 0, 0, 0); }
+static float4 mx_widen4(float2 v) { return float4(v, 0, 0); }
+static float4 mx_widen4(float3 v) { return float4(v, 0); }
+static float4 mx_widen4(float4 v) { return v; }
+static float mx_pick(float4 v, float4 i, float) { return mx_channel(v, i.x); }
+static float2 mx_pick(float4 v, float4 i, float2) { return float2(mx_channel(v, i.x), mx_channel(v, i.y)); }
+static float3 mx_pick(float4 v, float4 i, float3) { return float3(mx_channel(v, i.x), mx_channel(v, i.y), mx_channel(v, i.z)); }
+static float4 mx_pick(float4 v, float4 i, float4) { return float4(mx_channel(v, i.x), mx_channel(v, i.y), mx_channel(v, i.z), mx_channel(v, i.w)); }
+
+#define MX_SWIZZLE(FROM, T, TO, U) \
+    [[stitchable]] U mx_swizzle_##FROM##_##TO(T in, float4 channels) { return mx_pick(mx_widen4(in), channels, U()); }
+#define MX_SWIZZLE_TO(FROM, T) \
+    MX_SWIZZLE(FROM, T, float, float) \
+    MX_SWIZZLE(FROM, T, vector2, float2) \
+    MX_SWIZZLE(FROM, T, vector3, float3) \
+    MX_SWIZZLE(FROM, T, color3, float3) \
+    MX_SWIZZLE(FROM, T, vector4, float4) \
+    MX_SWIZZLE(FROM, T, color4, float4)
+MX_SWIZZLE_TO(float, float)
+MX_SWIZZLE_TO(vector2, float2)
+MX_SWIZZLE_TO(vector3, float3)
+MX_SWIZZLE_TO(color3, float3)
+MX_SWIZZLE_TO(vector4, float4)
+MX_SWIZZLE_TO(color4, float4)
+
+// MARK: RealityKit (Apple's ShaderGraph nodedefs, loaded with StandardLibrary.addingAppleShaderGraphNodes)
+
+MX_UNARY(realitykit_oneminus, 1.0 - in)
+[[stitchable]] float3 mx_realitykit_viewdirection_vector3(MXContext context, int space) {
+    return space == 1 ? context.viewDirectionWorld : context.viewDirectionObject;
+}
+
 [[stitchable]] float mx_magnitude_vector2(float2 in) { return length(in); }
 [[stitchable]] float mx_magnitude_vector3(float3 in) { return length(in); }
 [[stitchable]] float mx_magnitude_vector4(float4 in) { return length(in); }

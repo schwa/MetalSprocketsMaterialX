@@ -1001,3 +1001,53 @@ struct ParameterLayoutTests {
         #expect(library.hasFunction(named: ParameterLayout.advanceFunction))
     }
 }
+
+/// #46: RealityKit documents, with Apple's nodedefs loaded from the system ShaderGraph framework (skipped without it).
+@Suite(.serialized, .enabled(if: FileManager.default.fileExists(atPath: StandardLibrary.appleShaderGraphURL.path), "Apple's ShaderGraph framework is not installed"))
+struct RealityKitNodeTests {
+    static let library = Result { try StandardLibrary.shared.addingAppleShaderGraphNodes() }
+
+    @Test func appleNodeDefsLoadWithoutReplacingMaterialX139() throws {
+        let library = try Self.library.get()
+        #expect(library.nodeDefs.count > StandardLibrary.shared.nodeDefs.count + 1_000)
+        #expect(library.nodeDefs["ND_realitykit_pbr_surfaceshader"] != nil)
+        #expect(library.nodeDefs["ND_swizzle_color4_color3"] != nil)
+        // 1.39's standard_surface (with its inheritance) is kept, not replaced by 1.38's.
+        #expect(library.nodeDefs["ND_standard_surface_surfaceshader"]?.version == StandardLibrary.shared.nodeDefs["ND_standard_surface_surfaceshader"]?.version)
+    }
+
+    @Test func realityKitNodesStitch() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: Self.library.get())
+        let xml = """
+        <materialx version="1.38"><nodegraph name="g">
+          <constant name="c" type="color4"><input name="value" type="color4" value="0.2, 0.4, 0.6, 0.8" /></constant>
+          <swizzle name="bgr" type="color3"><input name="in" type="color4" nodename="c" /><input name="channels" type="string" value="bg1" /></swizzle>
+          <oneminus name="n" type="color3" nodedef="ND_realitykit_oneminus_color3"><input name="in" type="color3" nodename="bgr" /></oneminus>
+          <output name="out" type="color3" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "rk_test")
+        let value = try #require(try stitched.evaluate(at: [.zero]).first)
+        #expect(simd_distance(SIMD3(value.x, value.y, value.z), [0.4, 0.6, 0]) < 1e-5) // 1 - (0.6, 0.4, 1)
+    }
+
+    @Test func realityKitPBRSurfaceMaps() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: Self.library.get())
+        let xml = """
+        <materialx version="1.38">
+          <realitykit_pbr_surfaceshader name="s" type="surfaceshader">
+            <input name="baseColor" type="color3" value="0.1, 0.2, 0.3" />
+            <input name="metallic" type="float" value="0.9" />
+          </realitykit_pbr_surfaceshader>
+        </materialx>
+        """
+        let document = try MaterialXDocument(data: Data(xml.utf8))
+        let shader = try #require(document.nodes.first)
+        let surface = try #require(try stitcher.stitchSurface(shader, in: document, functionName: "rk_surface").evaluateSurface(contexts: [MXShadingContext(texcoord: .zero)]).first)
+        #expect(simd_distance(surface.baseColor, [0.1, 0.2, 0.3]) < 1e-6)
+        #expect(abs(surface.metallic - 0.9) < 1e-6)
+        #expect(abs(surface.roughness - 0.5) < 1e-6) // RealityKit's default
+    }
+}

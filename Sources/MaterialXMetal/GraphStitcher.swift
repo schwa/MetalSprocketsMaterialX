@@ -411,7 +411,25 @@ struct Builder {
     static let textureCategories: Set<String> = ["texture_slot"]
 
     /// Node categories whose functions take the shading context before the nodedef's inputs.
-    static let contextCategories: Set<String> = ["texcoord", "position", "normal", "tangent", "bitangent", "geomcolor", "viewdirection", "time", "frame"]
+    static let contextCategories: Set<String> = ["texcoord", "position", "normal", "tangent", "bitangent", "geomcolor", "viewdirection", "time", "frame", "realitykit_viewdirection"]
+
+    /// `swizzle`'s `channels` string as the vector4 of indices `mx_swizzle_*` takes: 0–3 per component letter
+    /// (`xyzw` or `rgba`), -1 for `0`, -2 for `1`.
+    static func swizzleIndices(_ channels: String) throws -> MaterialXValue {
+        var indices = [Float](repeating: -1, count: 4)
+        for (position, character) in channels.prefix(4).enumerated() {
+            indices[position] = switch character {
+            case "x", "r": 0
+            case "y", "g": 1
+            case "z", "b": 2
+            case "w", "a": 3
+            case "0": -1
+            case "1": -2
+            default: throw MaterialXError.invalidValue("swizzle channel '\(character)' in '\(channels)'")
+            }
+        }
+        return .numbers(indices)
+    }
 
     init(stitcher: GraphStitcher) {
         self.stitcher = stitcher
@@ -497,6 +515,10 @@ struct Builder {
                 throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'; only UV sets 0 and 1 are available")
             }
             stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
+        case let .function(functionName) where node.category == "swizzle":
+            let channels = stringValue("channels", of: node, nodeDef: nodeDef, in: scope) ?? ""
+            let indices = try parameter(name: nodeKey + ".channels", type: .vector4, value: Self.swizzleIndices(channels))
+            stitchingNode = try call(functionName, [try argument(try Self.input("in", of: nodeDef)), indices])
         case let .function(functionName) where node.category == "image":
             let file = stringValue("file", of: node, nodeDef: nodeDef, in: scope) ?? ""
             let filePrefix = node.input("file")?.element["fileprefix"] ?? node.element["fileprefix"] ?? scope.filePrefix ?? ""

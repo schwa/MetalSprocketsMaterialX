@@ -49,6 +49,13 @@ public struct SurfaceMapping: Sendable {
             ("metallic", "metallic"), ("roughness", "roughness"), ("clearcoat", "clearcoat"),
             ("clearcoatRoughness", "clearcoatRoughness"), ("opacity", "opacity"), ("ior", "ior"), ("occlusion", "occlusion"),
         ]),
+        // RealityKit's PBR shader (Apple's nodedefs, StandardLibrary.addingAppleShaderGraphNodes). Its normal is in
+        // tangent space like UsdPreviewSurface's and is not mapped yet.
+        "realitykit_pbr_surfaceshader": Self([
+            ("baseColor", "baseColor"), ("emissiveColor", "emissive"), ("roughness", "roughness"), ("metallic", "metallic"),
+            ("ambientOcclusion", "occlusion"), ("specular", "specular"), ("opacity", "opacity"), ("clearcoat", "clearcoat"),
+            ("clearcoatRoughness", "clearcoatRoughness"),
+        ]),
         "standard_surface": Self(
             [("normal", "normal"), ("coat_normal", "clearcoatNormal"), ("specular_IOR", "ior"), ("specular", "specular"), ("specular_color", "specularColor")],
             translations: ["standard_surface_to_gltf_pbr"],

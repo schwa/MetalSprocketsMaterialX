@@ -65,7 +65,26 @@ public struct StandardLibrary: Sendable {
         return library
     }
 
-    private mutating func add(_ newDocuments: [MaterialXDocument]) {
+    /// Apple's ShaderGraph MaterialX folder on this Mac, if present. Its files are Apple's and are not bundled.
+    public static let appleShaderGraphURL = URL(fileURLWithPath: "/System/Library/SubFrameworks/ShaderGraph.framework/Versions/A/Resources/MaterialX")
+
+    /// This library plus the nodedefs RealityKit / Reality Composer Pro documents use, read from Apple's ShaderGraph
+    /// framework on this Mac (opt-in; #46): `Apple/apple_nodedefs` (`realitykit_*`, `MTL_*`, …) and, from MaterialX
+    /// 1.38, only nodedefs this library lacks (such as `swizzle`). Many have no Metal implementation yet; they parse,
+    /// validate and report as unsupported. Throws if the framework is missing.
+    public func addingAppleShaderGraphNodes(from url: URL = appleShaderGraphURL) throws -> Self {
+        func documents(in folder: URL) throws -> [MaterialXDocument] {
+            let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            return try files.filter { $0.pathExtension == "mtlx" }.sorted { $0.path < $1.path }.map { try MaterialXDocument(url: $0) }
+        }
+        var library = self
+        let legacy = try documents(in: url.appendingPathComponent("MaterialX-1.38/MaterialX_NodeDefs"))
+        library.add(legacy, replacingExisting: false)
+        library.add(try documents(in: url.appendingPathComponent("Apple/apple_nodedefs")), replacingExisting: false)
+        return library
+    }
+
+    private mutating func add(_ newDocuments: [MaterialXDocument], replacingExisting: Bool = true) {
         documents += newDocuments
         var implementations: [(nodeDef: String, nodeGraph: String)] = []
         for document in newDocuments {
@@ -85,12 +104,12 @@ public struct StandardLibrary: Sendable {
             for typeDef in document.typeDefs {
                 typeDefs[typeDef.name] = typeDef
             }
-            for nodeDef in document.nodeDefs {
+            for nodeDef in document.nodeDefs where replacingExisting || unresolvedNodeDefs[nodeDef.name] == nil {
                 unresolvedNodeDefs[nodeDef.name] = nodeDef
             }
-            for graph in document.nodeGraphs {
+            for graph in document.nodeGraphs where replacingExisting || graphsByName[graph.name] == nil {
                 graphsByName[graph.name] = graph
-                if let nodeDef = graph.nodeDefName {
+                if let nodeDef = graph.nodeDefName, replacingExisting || nodeGraphs[nodeDef] == nil {
                     nodeGraphs[nodeDef] = graph
                 }
             }

@@ -859,12 +859,13 @@ MetalSprocketsShaderGraph (node editor, own ShaderGraph.swift using function sti
 ## 46: USD / RealityKit ShaderGraph (ND_RealityKit*) nodes are not supported
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:l, area:nodes, area:integration
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:17:55Z
+closed: 2026-11-23T14:17:55Z
 +++
 
 Reality Composer Pro and USD files on this machine use Apple's MaterialX extensions (ShaderGraph.framework apple_nodedefs, CoreUSDEdit aapl nodes, ND_RealityKitTexture2D etc.). Documents that use them fail with missingNodeDef.
@@ -872,6 +873,7 @@ Reality Composer Pro and USD files on this machine use Apple's MaterialX extensi
 - `2026-11-23T13:35:18Z`: Apple's nodedefs are in /System/Library/SubFrameworks/ShaderGraph.framework/Versions/A/Resources/MaterialX/Apple/apple_nodedefs (14 files, ~1,450 nodedefs, MaterialX 1.38, generated). Their implementations are target="realitykit" function names with no source, and they use types the bundled libraries lack (integer2, ...). The files are Apple's and cannot be vendored.
 - `2026-11-23T13:35:18Z`: Question 1 (design): Support RealityKit documents by loading Apple's nodedefs from the system ShaderGraph.framework at run time (opt-in, so they parse and validate) and implementing their Metal functions by hand, starting with the nodes the Reality Composer Pro sample assets actually use? Recommended: Yes, opt-in loading plus the most-used nodes first
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:17:55Z`: Per #46-Q1 (opt-in loading, most-used nodes first): StandardLibrary.addingAppleShaderGraphNodes() reads Apple's nodedefs from /System/Library/SubFrameworks/ShaderGraph.framework at run time (not bundled; Apple's files): Apple/apple_nodedefs plus MaterialX 1.38 nodedefs this library lacks (e.g. swizzle), without replacing 1.39 definitions. Usage in Reality Composer Pro's .usda assets on this Mac picked the first nodes: swizzle (all 36 type pairs; channels string → index vector), realitykit_oneminus, realitykit_viewdirection, safepower and crossproduct (stdlib nodes RCP assets use), and a SurfaceMapping for realitykit_pbr_surfaceshader. Tests: RealityKitNodeTests (skipped without the framework). Remaining RealityKit nodes are filed as a follow-up issue.
 
 ---
 
@@ -1189,5 +1191,25 @@ The kernel source hard-codes the stitched function signature, so #22 will need e
 
 - `2026-11-23T13:38:12Z`: Related: #22 (signature change would update every copy) and #58.
 - `2026-11-23T13:44:03Z`: Public StitchedGraph.evaluate(at:device:) runs a graph per texture coordinate and returns float4 results (any output type: float…float4, color, integer, boolean). The shared test helper StitchingTests.evaluate is now a one-line wrapper and the returnType arguments are gone from all call sites; ReferenceImplementationTests uses it too. StitchingPerformanceTests keeps its own kernels on purpose: it measures direct vs function-table linking. Test: EvaluateTests.
+
+---
+
+## 62: Remaining RealityKit nodes have no Metal implementation
+
++++
+status: new
+priority: low
+kind: feature
+labels: area:nodes, area:integration, effort:l
+depends: 46
+created: 2026-11-23T14:17:55Z
++++
+
+With Apple's nodedefs loaded (StandardLibrary.addingAppleShaderGraphNodes, #46), these RealityKit nodes used by Reality Composer Pro assets on this Mac still fail with unsupportedNode:
+- realitykit_unlit_surfaceshader (19 uses): no MXSurfaceInputs mapping (an unlit color does not fit the PBR inputs)
+- realitykit_geometrymodifier / geometrymodifier_2_0 vertexshader (24 uses): vertex-stage, not a fragment value
+- realitykit_environment_radiance (3 uses): needs lighting (#37)
+- realitykit_image (56 nodedefs), MTL_* bitwise/integer ops, and the other ~1,400 Apple nodedefs
+The tangent-space normal input of realitykit_pbr_surfaceshader is not mapped either.
 
 ---
