@@ -91,6 +91,30 @@ MX_POWER(color4FA, float4, float)
 [[stitchable]] float2 mx_transformmatrix_vector2M3(float2 in, float3x3 mat) { return (mat * float3(in, 1)).xy; }
 [[stitchable]] float3 mx_transformmatrix_vector3M4(float3 in, float4x4 mat) { return (mat * float4(in, 1)).xyz; }
 
+#define MX_UNARY(NAME, EXPR) \
+    [[stitchable]] float mx_##NAME##_float(float in) { return EXPR; } \
+    [[stitchable]] float2 mx_##NAME##_vector2(float2 in) { return EXPR; } \
+    [[stitchable]] float3 mx_##NAME##_vector3(float3 in) { return EXPR; } \
+    [[stitchable]] float4 mx_##NAME##_vector4(float4 in) { return EXPR; } \
+    [[stitchable]] float3 mx_##NAME##_color3(float3 in) { return EXPR; } \
+    [[stitchable]] float4 mx_##NAME##_color4(float4 in) { return EXPR; }
+MX_UNARY(absval, abs(in))
+MX_UNARY(sign, sign(in))
+
+#define MX_CLAMP(SUFFIX, T, U) \
+    [[stitchable]] T mx_clamp_##SUFFIX(T in, U low, U high) { return clamp(in, T(low), T(high)); }
+MX_CLAMP(float, float, float)
+MX_CLAMP(vector2, float2, float2)
+MX_CLAMP(vector3, float3, float3)
+MX_CLAMP(vector4, float4, float4)
+MX_CLAMP(color3, float3, float3)
+MX_CLAMP(color4, float4, float4)
+MX_CLAMP(vector2FA, float2, float)
+MX_CLAMP(vector3FA, float3, float)
+MX_CLAMP(vector4FA, float4, float)
+MX_CLAMP(color3FA, float3, float)
+MX_CLAMP(color4FA, float4, float)
+
 #define MX_MIX(SUFFIX, T, M) \
     [[stitchable]] T mx_mix_##SUFFIX(T fg, T bg, M mix) { return metal::mix(bg, fg, mix); }
 
@@ -105,6 +129,133 @@ MX_MIX(vector3_vector3, float3, float3)
 MX_MIX(vector4_vector4, float4, float4)
 MX_MIX(color3_color3, float3, float3)
 MX_MIX(color4_color4, float4, float4)
+
+// MARK: Adjustment
+// Ported from MaterialX's genglsl implementations. range, colorcorrect, hsvadjust and saturate are functional
+// nodegraphs built from these.
+
+constant float MX_FLOAT_EPS = 1e-8;
+
+#define MX_REMAP(SUFFIX, T, U) \
+    [[stitchable]] T mx_remap_##SUFFIX(T in, U inlow, U inhigh, U outlow, U outhigh) { \
+        return T(outlow) + (in - T(inlow)) * (T(outhigh) - T(outlow)) / (T(inhigh) - T(inlow)); }
+MX_REMAP(float, float, float)
+MX_REMAP(vector2, float2, float2)
+MX_REMAP(vector3, float3, float3)
+MX_REMAP(vector4, float4, float4)
+MX_REMAP(color3, float3, float3)
+MX_REMAP(color4, float4, float4)
+MX_REMAP(vector2FA, float2, float)
+MX_REMAP(vector3FA, float3, float)
+MX_REMAP(vector4FA, float4, float)
+MX_REMAP(color3FA, float3, float)
+MX_REMAP(color4FA, float4, float)
+
+[[stitchable]] float mx_smoothstep_float(float in, float low, float high) {
+    return in >= high ? 1.0 : in <= low ? 0.0 : smoothstep(low, high, in);
+}
+
+[[stitchable]] float3 mx_luminance_color3(float3 in, float3 lumacoeffs) { return float3(dot(in, lumacoeffs)); }
+[[stitchable]] float4 mx_luminance_color4(float4 in, float3 lumacoeffs) { return float4(float3(dot(in.rgb, lumacoeffs)), in.a); }
+
+static float3 mx_hsvtorgb(float3 hsv) {
+    float h = hsv.x, s = hsv.y, v = hsv.z;
+    if (s < 0.0001) {
+        return float3(v);
+    }
+    h = 6.0 * (h - floor(h));
+    int hi = int(trunc(h));
+    float f = h - float(hi);
+    float p = v * (1.0 - s);
+    float q = v * (1.0 - s * f);
+    float t = v * (1.0 - s * (1.0 - f));
+    switch (hi) {
+    case 0: return float3(v, t, p);
+    case 1: return float3(q, v, p);
+    case 2: return float3(p, v, t);
+    case 3: return float3(p, q, v);
+    case 4: return float3(t, p, v);
+    default: return float3(v, p, q);
+    }
+}
+
+static float3 mx_rgbtohsv(float3 c) {
+    float r = c.x, g = c.y, b = c.z;
+    float mincomp = min(r, min(g, b));
+    float maxcomp = max(r, max(g, b));
+    float delta = maxcomp - mincomp;
+    float h = 0, s = maxcomp > 0.0 ? delta / maxcomp : 0.0;
+    if (s > 0.0) {
+        if (r >= maxcomp) h = (g - b) / delta;
+        else if (g >= maxcomp) h = 2.0 + (b - r) / delta;
+        else h = 4.0 + (r - g) / delta;
+        h *= 1.0 / 6.0;
+        if (h < 0.0) h += 1.0;
+    }
+    return float3(h, s, maxcomp);
+}
+
+[[stitchable]] float3 mx_hsvtorgb_color3(float3 in) { return mx_hsvtorgb(in); }
+[[stitchable]] float4 mx_hsvtorgb_color4(float4 in) { return float4(mx_hsvtorgb(in.rgb), in.a); }
+[[stitchable]] float3 mx_rgbtohsv_color3(float3 in) { return mx_rgbtohsv(in); }
+[[stitchable]] float4 mx_rgbtohsv_color4(float4 in) { return float4(mx_rgbtohsv(in.rgb), in.a); }
+
+// MARK: Compositing
+
+static float mx_burn(float fg, float bg, float mix) {
+    return abs(fg) < MX_FLOAT_EPS ? 0.0 : mix * (1.0 - ((1.0 - bg) / fg)) + ((1.0 - mix) * bg);
+}
+static float mx_dodge(float fg, float bg, float mix) {
+    return abs(1.0 - fg) < MX_FLOAT_EPS ? 0.0 : mix * (bg / (1.0 - fg)) + ((1.0 - mix) * bg);
+}
+
+#define MX_PER_COMPONENT(NAME) \
+    [[stitchable]] float mx_##NAME##_float(float fg, float bg, float mix) { return mx_##NAME(fg, bg, mix); } \
+    [[stitchable]] float3 mx_##NAME##_color3(float3 fg, float3 bg, float mix) { \
+        return float3(mx_##NAME(fg.x, bg.x, mix), mx_##NAME(fg.y, bg.y, mix), mx_##NAME(fg.z, bg.z, mix)); } \
+    [[stitchable]] float4 mx_##NAME##_color4(float4 fg, float4 bg, float mix) { \
+        return float4(mx_##NAME(fg.x, bg.x, mix), mx_##NAME(fg.y, bg.y, mix), mx_##NAME(fg.z, bg.z, mix), mx_##NAME(fg.w, bg.w, mix)); }
+MX_PER_COMPONENT(burn)
+MX_PER_COMPONENT(dodge)
+
+#define MX_BLEND(NAME, EXPR) \
+    [[stitchable]] float mx_##NAME##_float(float fg, float bg, float mix) { return EXPR; } \
+    [[stitchable]] float3 mx_##NAME##_color3(float3 fg, float3 bg, float mix) { return EXPR; } \
+    [[stitchable]] float4 mx_##NAME##_color4(float4 fg, float4 bg, float mix) { return EXPR; }
+MX_BLEND(plus, (mix * (bg + fg)) + ((1.0 - mix) * bg))
+MX_BLEND(minus, (mix * (bg - fg)) + ((1.0 - mix) * bg))
+MX_BLEND(difference, (mix * abs(bg - fg)) + ((1.0 - mix) * bg))
+MX_BLEND(screen, (mix * (1.0 - (1.0 - fg) * (1.0 - bg))) + ((1.0 - mix) * bg))
+
+#define MX_MASKED(NAME, EXPR) \
+    [[stitchable]] float mx_##NAME##_float(float in, float mask) { return EXPR; } \
+    [[stitchable]] float3 mx_##NAME##_color3(float3 in, float mask) { return EXPR; } \
+    [[stitchable]] float4 mx_##NAME##_color4(float4 in, float mask) { return EXPR; }
+MX_MASKED(inside, in * mask)
+MX_MASKED(outside, in * (1.0 - mask))
+
+[[stitchable]] float4 mx_over_color4(float4 fg, float4 bg, float mix) { return (fg + bg * (1.0 - fg.a)) * mix + bg * (1.0 - mix); }
+[[stitchable]] float4 mx_in_color4(float4 fg, float4 bg, float mix) { return fg * bg.a * mix + bg * (1.0 - mix); }
+[[stitchable]] float4 mx_mask_color4(float4 fg, float4 bg, float mix) { return bg * fg.a * mix + bg * (1.0 - mix); }
+[[stitchable]] float4 mx_out_color4(float4 fg, float4 bg, float mix) { return fg * (1.0 - bg.a) * mix + bg * (1.0 - mix); }
+[[stitchable]] float4 mx_matte_color4(float4 fg, float4 bg, float mix) {
+    return float4(fg.xyz * fg.w + bg.xyz * (1.0 - fg.w), fg.w + bg.w * (1.0 - fg.w)) * mix + bg * (1.0 - mix);
+}
+[[stitchable]] float4 mx_disjointover_color4(float4 fg, float4 bg, float mix) {
+    float summedAlpha = fg.w + bg.w;
+    float4 result;
+    if (summedAlpha <= 1.0) {
+        result.xyz = fg.xyz + bg.xyz;
+    } else if (abs(bg.w) < MX_FLOAT_EPS) {
+        result.xyz = float3(0.0);
+    } else {
+        result.xyz = fg.xyz + bg.xyz * ((1.0 - fg.w) / bg.w);
+    }
+    result.w = min(summedAlpha, 1.0);
+    return result * mix + (1.0 - mix) * bg;
+}
+[[stitchable]] float4 mx_premult_color4(float4 in) { return float4(in.rgb * in.a, in.a); }
+[[stitchable]] float4 mx_unpremult_color4(float4 in) { return float4(in.rgb / in.a, in.a); }
 
 // MARK: Conditional
 // Suffix-free nodedefs compare floats, `I` integers, `B` booleans. switch and logical_xor are functional nodegraphs

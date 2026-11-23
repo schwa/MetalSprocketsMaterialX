@@ -229,15 +229,18 @@ ifgreater, ifgreatereq, ifequal, switch, and/or/not/xor (1.39 boolean nodes) hav
 ## 14: Adjustment and compositing nodes are missing
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:l, area:nodes
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:13:56Z
+closed: 2026-11-23T13:13:56Z
 +++
 
 remap, smoothstep, luminance, rgbtohsv, hsvtorgb, contrast, range, hsvadjust, saturate, colorcorrect, premult, unpremult, plus, minus, difference, burn, dodge, screen, overlay, disjointover, in, mask, matte, out, over, inside, outside have no implementation.
+
+- `2026-11-23T13:13:56Z`: Every non-shader adjustment/compositing nodedef stitches: remap, smoothstep, luminance, rgbtohsv/hsvtorgb, burn, dodge, plus, minus, difference, screen, inside, outside, over, in, mask, matte, out, disjointover, premult, unpremult as Metal functions (ported from genglsl); range, contrast, saturate, hsvadjust, colorcorrect through their nodegraphs. Also added absval, sign, clamp. mix_surfaceshader etc. wait on shader closures (#33). Tests: AdjustmentAndCompositingTests; reference-expression test covers the inline ones.
 
 ---
 
