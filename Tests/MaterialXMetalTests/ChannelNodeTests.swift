@@ -1142,3 +1142,87 @@ struct RampAndSplitTests {
         #expect(missing.isEmpty, "\(missing)")
     }
 }
+
+/// #64: matrix nodes, read back by transforming a vector.
+@Suite(.serialized)
+struct MatrixNodeTests {
+    static let m33 = "<creatematrix name=\"m\" type=\"matrix33\" nodedef=\"ND_creatematrix_vector3_matrix33\"><input name=\"in1\" type=\"vector3\" value=\"2, 0, 0\" /><input name=\"in2\" type=\"vector3\" value=\"0, 3, 0\" /><input name=\"in3\" type=\"vector3\" value=\"1, 0, 4\" /></creatematrix>"
+
+    func transform(_ body: String, matrix: String = "result", vector: String = "1, 1, 1") throws -> SIMD3<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">\(Self.m33)\(body)
+          <transformmatrix name="n" type="vector3"><input name="in" type="vector3" value="\(vector)" /><input name="mat" type="matrix33" nodename="\(matrix)" /></transformmatrix>
+          <output name="out" type="vector3" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try #require(try MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g"))
+        let values = try stitcher.stitch(graph, functionName: "matrix_test").evaluate(at: [.zero])
+        let value = try #require(values.first)
+        return [value.x, value.y, value.z]
+    }
+
+    @Test func createTransposeInvert() throws {
+        // Columns (2,0,0), (0,3,0), (1,0,4): M·(1,1,1) = (3, 3, 4).
+        #expect(try transform("", matrix: "m") == [3, 3, 4])
+        #expect(try transform("<transpose name=\"result\" type=\"matrix33\"><input name=\"in\" type=\"matrix33\" nodename=\"m\" /></transpose>") == [2, 3, 5])
+        let inverse = try transform("<invertmatrix name=\"result\" type=\"matrix33\"><input name=\"in\" type=\"matrix33\" nodename=\"m\" /></invertmatrix>", vector: "3, 3, 4")
+        #expect(simd_distance(inverse, [1, 1, 1]) < 1e-5)
+    }
+
+    @Test func arithmeticFollowsMaterialXOrder() throws {
+        // multiply is in2 · in1: with in2 = M and in1 = identity scaled by 2 the result is 2M.
+        let twice = "<creatematrix name=\"two\" type=\"matrix33\" nodedef=\"ND_creatematrix_vector3_matrix33\"><input name=\"in1\" type=\"vector3\" value=\"2, 0, 0\" /><input name=\"in2\" type=\"vector3\" value=\"0, 2, 0\" /><input name=\"in3\" type=\"vector3\" value=\"0, 0, 2\" /></creatematrix>"
+        #expect(try transform(twice + "<multiply name=\"result\" type=\"matrix33\"><input name=\"in1\" type=\"matrix33\" nodename=\"two\" /><input name=\"in2\" type=\"matrix33\" nodename=\"m\" /></multiply>") == [6, 6, 8])
+        // divide is inverse(in2) · in1: M / M = identity.
+        #expect(try transform("<divide name=\"result\" type=\"matrix33\"><input name=\"in1\" type=\"matrix33\" nodename=\"m\" /><input name=\"in2\" type=\"matrix33\" nodename=\"m\" /></divide>") == [1, 1, 1])
+        // add with a float adds to every element: (M + 1)·(1,1,1) = M·(1,1,1) + 3.
+        #expect(try transform("<add name=\"result\" type=\"matrix33\"><input name=\"in1\" type=\"matrix33\" nodename=\"m\" /><input name=\"in2\" type=\"float\" value=\"1\" /></add>") == [6, 6, 7])
+    }
+
+    @Test func determinantAndConditional() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">\(Self.m33)
+          <determinant name="n" type="float"><input name="in" type="matrix33" nodename="m" /></determinant>
+          <output name="out" type="float" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try #require(try MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g"))
+        #expect(try stitcher.stitch(graph, functionName: "det").evaluate(at: [.zero]).first?.x == 24)
+        // ifgreater picks a matrix.
+        #expect(try transform("<ifgreater name=\"result\" type=\"matrix33\"><input name=\"value1\" type=\"float\" value=\"1\" /><input name=\"value2\" type=\"float\" value=\"0\" /><input name=\"in1\" type=\"matrix33\" nodename=\"m\" /></ifgreater>") == [3, 3, 4])
+    }
+
+    @Test func matrix44InverseUndoesTheMatrix() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <creatematrix name="m" type="matrix44" nodedef="ND_creatematrix_vector4_matrix44">
+            <input name="in1" type="vector4" value="2, 1, 0, 0" /><input name="in2" type="vector4" value="0, 3, 1, 0" />
+            <input name="in3" type="vector4" value="1, 0, 4, 0" /><input name="in4" type="vector4" value="5, 6, 7, 1" />
+          </creatematrix>
+          <invertmatrix name="inverse" type="matrix44"><input name="in" type="matrix44" nodename="m" /></invertmatrix>
+          <transformmatrix name="forward" type="vector4"><input name="in" type="vector4" value="1, 2, 3, 1" /><input name="mat" type="matrix44" nodename="m" /></transformmatrix>
+          <transformmatrix name="n" type="vector4"><input name="in" type="vector4" nodename="forward" /><input name="mat" type="matrix44" nodename="inverse" /></transformmatrix>
+          <output name="out" type="vector4" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try #require(try MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g"))
+        let value = try #require(try stitcher.stitch(graph, functionName: "inverse44").evaluate(at: [.zero]).first)
+        #expect(simd_distance(value, [1, 2, 3, 1]) < 1e-4, "\(value)")
+    }
+
+    @Test func everyMatrixNodeDefIsSupported() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let coverage = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device)).coverage()
+        let matrixDefs = StandardLibrary.shared.nodeDefs.values.filter { nodeDef in
+            nodeDef.inputs.contains { $0.type == .matrix33 || $0.type == .matrix44 } || [.matrix33, .matrix44].contains(nodeDef.outputs.first?.type ?? .float)
+        }
+        let missing = matrixDefs.map(\.name).filter { coverage[$0] == .unsupported }.sorted()
+        #expect(missing.isEmpty, "\(missing)")
+    }
+}

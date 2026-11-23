@@ -1247,14 +1247,18 @@ asin, acos and atan2 (all float and vector variants) have no Metal implementatio
 ## 64: Matrix nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, subtask, area:nodes
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:37:59Z
+closed: 2026-11-23T14:37:59Z
 +++
 
 creatematrix, transpose, determinant, invertmatrix, and the matrix33/matrix44 variants of the conditional and convert nodes have no Metal implementation. Acceptance: those nodedefs report as supported in coverage() and stitch; values checked against hand-computed matrices. Part of #11.
+
+- `2026-11-23T14:37:59Z`: creatematrix (3 variants), transpose, determinant, invertmatrix (3×3 adjugate; 4×4 cofactor), add/subtract (incl. float), multiply (in2·in1) and divide (inverse(in2)·in1) as in MaterialX's GLSL, and matrix33/44 variants of ifgreater/ifgreatereq/ifequal (switch follows through its nodegraph). Every nodedef with a matrix input or output is now supported. Tests: MatrixNodeTests (failed before), including a 4×4 inverse round trip.
 
 ---
 

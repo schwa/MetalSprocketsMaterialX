@@ -23,6 +23,10 @@ ND_add_color3FA metal
 ND_add_color4 metal
 ND_add_color4FA metal
 ND_add_float metal
+ND_add_matrix33 metal
+ND_add_matrix33FA metal
+ND_add_matrix44 metal
+ND_add_matrix44FA metal
 ND_add_vector2 metal
 ND_add_vector2FA metal
 ND_add_vector3 metal
@@ -143,8 +147,13 @@ ND_cos_float metal
 ND_cos_vector2 metal
 ND_cos_vector3 metal
 ND_cos_vector4 metal
+ND_creatematrix_vector3_matrix33 metal
+ND_creatematrix_vector3_matrix44 metal
+ND_creatematrix_vector4_matrix44 metal
 ND_crosshatch_color3 nodeGraph
 ND_crossproduct_vector3 metal
+ND_determinant_matrix33 metal
+ND_determinant_matrix44 metal
 ND_difference_color3 metal
 ND_difference_color4 metal
 ND_difference_float metal
@@ -157,6 +166,8 @@ ND_divide_color3FA metal
 ND_divide_color4 metal
 ND_divide_color4FA metal
 ND_divide_float metal
+ND_divide_matrix33 metal
+ND_divide_matrix44 metal
 ND_divide_vector2 metal
 ND_divide_vector2FA metal
 ND_divide_vector3 metal
@@ -242,6 +253,12 @@ ND_ifequal_floatI metal
 ND_ifequal_integer metal
 ND_ifequal_integerB metal
 ND_ifequal_integerI metal
+ND_ifequal_matrix33 metal
+ND_ifequal_matrix33B metal
+ND_ifequal_matrix33I metal
+ND_ifequal_matrix44 metal
+ND_ifequal_matrix44B metal
+ND_ifequal_matrix44I metal
 ND_ifequal_vector2 metal
 ND_ifequal_vector2B metal
 ND_ifequal_vector2I metal
@@ -261,6 +278,10 @@ ND_ifgreater_float metal
 ND_ifgreater_floatI metal
 ND_ifgreater_integer metal
 ND_ifgreater_integerI metal
+ND_ifgreater_matrix33 metal
+ND_ifgreater_matrix33I metal
+ND_ifgreater_matrix44 metal
+ND_ifgreater_matrix44I metal
 ND_ifgreater_vector2 metal
 ND_ifgreater_vector2I metal
 ND_ifgreater_vector3 metal
@@ -277,6 +298,10 @@ ND_ifgreatereq_float metal
 ND_ifgreatereq_floatI metal
 ND_ifgreatereq_integer metal
 ND_ifgreatereq_integerI metal
+ND_ifgreatereq_matrix33 metal
+ND_ifgreatereq_matrix33I metal
+ND_ifgreatereq_matrix44 metal
+ND_ifgreatereq_matrix44I metal
 ND_ifgreatereq_vector2 metal
 ND_ifgreatereq_vector2I metal
 ND_ifgreatereq_vector3 metal
@@ -304,6 +329,8 @@ ND_invert_vector3 metal
 ND_invert_vector3FA metal
 ND_invert_vector4 metal
 ND_invert_vector4FA metal
+ND_invertmatrix_matrix33 metal
+ND_invertmatrix_matrix44 metal
 ND_latlongimage nodeGraph
 ND_lin_adobergb_to_lin_rec709_color3 nodeGraph
 ND_lin_adobergb_to_lin_rec709_color4 nodeGraph
@@ -377,6 +404,8 @@ ND_multiply_color3FA metal
 ND_multiply_color4 metal
 ND_multiply_color4FA metal
 ND_multiply_float metal
+ND_multiply_matrix33 metal
+ND_multiply_matrix44 metal
 ND_multiply_vector2 metal
 ND_multiply_vector2FA metal
 ND_multiply_vector3 metal
@@ -538,6 +567,10 @@ ND_subtract_color3FA metal
 ND_subtract_color4 metal
 ND_subtract_color4FA metal
 ND_subtract_float metal
+ND_subtract_matrix33 metal
+ND_subtract_matrix33FA metal
+ND_subtract_matrix44 metal
+ND_subtract_matrix44FA metal
 ND_subtract_vector2 metal
 ND_subtract_vector2FA metal
 ND_subtract_vector3 metal
@@ -550,6 +583,10 @@ ND_switch_color4 nodeGraph
 ND_switch_color4I nodeGraph
 ND_switch_float nodeGraph
 ND_switch_floatI nodeGraph
+ND_switch_matrix33 nodeGraph
+ND_switch_matrix33I nodeGraph
+ND_switch_matrix44 nodeGraph
+ND_switch_matrix44I nodeGraph
 ND_switch_vector2 nodeGraph
 ND_switch_vector2I nodeGraph
 ND_switch_vector3 nodeGraph
@@ -576,6 +613,8 @@ ND_transformmatrix_vector2M3 metal
 ND_transformmatrix_vector3 metal
 ND_transformmatrix_vector3M4 metal
 ND_transformmatrix_vector4 metal
+ND_transpose_matrix33 metal
+ND_transpose_matrix44 metal
 ND_trianglewave_float nodeGraph
 ND_triplanarprojection_color3 nodeGraph
 ND_triplanarprojection_color4 nodeGraph

@@ -217,6 +217,82 @@ MX_POWER(vector4FA, float4, float)
 MX_POWER(color3FA, float3, float)
 MX_POWER(color4FA, float4, float)
 
+// MARK: Matrices
+// Matrix values are column-major, as GLSL's matN constructor fills them (see ParameterLayout).
+
+[[stitchable]] float3x3 mx_creatematrix_vector3_matrix33(float3 in1, float3 in2, float3 in3) { return float3x3(in1, in2, in3); }
+[[stitchable]] float4x4 mx_creatematrix_vector3_matrix44(float3 in1, float3 in2, float3 in3, float3 in4) {
+    return float4x4(float4(in1, 0), float4(in2, 0), float4(in3, 0), float4(in4, 1));
+}
+[[stitchable]] float4x4 mx_creatematrix_vector4_matrix44(float4 in1, float4 in2, float4 in3, float4 in4) { return float4x4(in1, in2, in3, in4); }
+
+[[stitchable]] float3x3 mx_transpose_matrix33(float3x3 in) { return transpose(in); }
+[[stitchable]] float4x4 mx_transpose_matrix44(float4x4 in) { return transpose(in); }
+[[stitchable]] float mx_determinant_matrix33(float3x3 in) { return determinant(in); }
+[[stitchable]] float mx_determinant_matrix44(float4x4 in) { return determinant(in); }
+
+static float3x3 mx_inverse(float3x3 m) {
+    float3 a = m[0], b = m[1], c = m[2];
+    float3 r0 = cross(b, c), r1 = cross(c, a), r2 = cross(a, b);
+    float inverseDeterminant = 1.0 / dot(r2, c);
+    return transpose(float3x3(r0, r1, r2)) * inverseDeterminant;
+}
+
+static float4x4 mx_inverse(float4x4 m) {
+    // Cofactors via 2×2 sub-determinants (as in GLM's inverse).
+    float s0 = m[0][0] * m[1][1] - m[1][0] * m[0][1];
+    float s1 = m[0][0] * m[1][2] - m[1][0] * m[0][2];
+    float s2 = m[0][0] * m[1][3] - m[1][0] * m[0][3];
+    float s3 = m[0][1] * m[1][2] - m[1][1] * m[0][2];
+    float s4 = m[0][1] * m[1][3] - m[1][1] * m[0][3];
+    float s5 = m[0][2] * m[1][3] - m[1][2] * m[0][3];
+    float c5 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
+    float c4 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
+    float c3 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
+    float c2 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
+    float c1 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
+    float c0 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
+    float inverseDeterminant = 1.0 / (s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0);
+    float4x4 result;
+    result[0][0] = ( m[1][1] * c5 - m[1][2] * c4 + m[1][3] * c3) * inverseDeterminant;
+    result[0][1] = (-m[0][1] * c5 + m[0][2] * c4 - m[0][3] * c3) * inverseDeterminant;
+    result[0][2] = ( m[3][1] * s5 - m[3][2] * s4 + m[3][3] * s3) * inverseDeterminant;
+    result[0][3] = (-m[2][1] * s5 + m[2][2] * s4 - m[2][3] * s3) * inverseDeterminant;
+    result[1][0] = (-m[1][0] * c5 + m[1][2] * c2 - m[1][3] * c1) * inverseDeterminant;
+    result[1][1] = ( m[0][0] * c5 - m[0][2] * c2 + m[0][3] * c1) * inverseDeterminant;
+    result[1][2] = (-m[3][0] * s5 + m[3][2] * s2 - m[3][3] * s1) * inverseDeterminant;
+    result[1][3] = ( m[2][0] * s5 - m[2][2] * s2 + m[2][3] * s1) * inverseDeterminant;
+    result[2][0] = ( m[1][0] * c4 - m[1][1] * c2 + m[1][3] * c0) * inverseDeterminant;
+    result[2][1] = (-m[0][0] * c4 + m[0][1] * c2 - m[0][3] * c0) * inverseDeterminant;
+    result[2][2] = ( m[3][0] * s4 - m[3][1] * s2 + m[3][3] * s0) * inverseDeterminant;
+    result[2][3] = (-m[2][0] * s4 + m[2][1] * s2 - m[2][3] * s0) * inverseDeterminant;
+    result[3][0] = (-m[1][0] * c3 + m[1][1] * c1 - m[1][2] * c0) * inverseDeterminant;
+    result[3][1] = ( m[0][0] * c3 - m[0][1] * c1 + m[0][2] * c0) * inverseDeterminant;
+    result[3][2] = (-m[3][0] * s3 + m[3][1] * s1 - m[3][2] * s0) * inverseDeterminant;
+    result[3][3] = ( m[2][0] * s3 - m[2][1] * s1 + m[2][2] * s0) * inverseDeterminant;
+    return result;
+}
+
+[[stitchable]] float3x3 mx_invertmatrix_matrix33(float3x3 in) { return mx_inverse(in); }
+[[stitchable]] float4x4 mx_invertmatrix_matrix44(float4x4 in) { return mx_inverse(in); }
+
+// Arithmetic follows MaterialX's GLSL: add/subtract are per element (also with a float), multiply is in2 · in1,
+// divide is inverse(in2) · in1.
+static float3x3 mx_splat3(float v) { return float3x3(float3(v), float3(v), float3(v)); }
+static float4x4 mx_splat4(float v) { return float4x4(float4(v), float4(v), float4(v), float4(v)); }
+[[stitchable]] float3x3 mx_add_matrix33(float3x3 in1, float3x3 in2) { return in1 + in2; }
+[[stitchable]] float4x4 mx_add_matrix44(float4x4 in1, float4x4 in2) { return in1 + in2; }
+[[stitchable]] float3x3 mx_add_matrix33FA(float3x3 in1, float in2) { return in1 + mx_splat3(in2); }
+[[stitchable]] float4x4 mx_add_matrix44FA(float4x4 in1, float in2) { return in1 + mx_splat4(in2); }
+[[stitchable]] float3x3 mx_subtract_matrix33(float3x3 in1, float3x3 in2) { return in1 - in2; }
+[[stitchable]] float4x4 mx_subtract_matrix44(float4x4 in1, float4x4 in2) { return in1 - in2; }
+[[stitchable]] float3x3 mx_subtract_matrix33FA(float3x3 in1, float in2) { return in1 - mx_splat3(in2); }
+[[stitchable]] float4x4 mx_subtract_matrix44FA(float4x4 in1, float in2) { return in1 - mx_splat4(in2); }
+[[stitchable]] float3x3 mx_multiply_matrix33(float3x3 in1, float3x3 in2) { return in2 * in1; }
+[[stitchable]] float4x4 mx_multiply_matrix44(float4x4 in1, float4x4 in2) { return in2 * in1; }
+[[stitchable]] float3x3 mx_divide_matrix33(float3x3 in1, float3x3 in2) { return mx_inverse(in2) * in1; }
+[[stitchable]] float4x4 mx_divide_matrix44(float4x4 in1, float4x4 in2) { return mx_inverse(in2) * in1; }
+
 [[stitchable]] float3 mx_transformmatrix_vector3(float3 in, float3x3 mat) { return mat * in; }
 [[stitchable]] float4 mx_transformmatrix_vector4(float4 in, float4x4 mat) { return mat * in; }
 [[stitchable]] float2 mx_transformmatrix_vector2M3(float2 in, float3x3 mat) { return (mat * float3(in, 1)).xy; }
@@ -509,6 +585,8 @@ MX_RAMP_SPLIT(color4, float4)
     [[stitchable]] T mx_##NAME##_##SUFFIX(V value1, V value2, T in1, T in2) { return value1 OP value2 ? in1 : in2; }
 
 #define MX_IF_TYPES(NAME, OP, VARIANT, V) \
+    MX_IF(NAME, OP, matrix33##VARIANT, float3x3, V) \
+    MX_IF(NAME, OP, matrix44##VARIANT, float4x4, V) \
     MX_IF(NAME, OP, float##VARIANT, float, V) \
     MX_IF(NAME, OP, integer##VARIANT, int, V) \
     MX_IF(NAME, OP, color3##VARIANT, float3, V) \
