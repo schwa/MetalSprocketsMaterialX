@@ -40,17 +40,35 @@ public struct StandardLibrary: Sendable {
         self.init(documents: documents)
     }
 
+    /// Nodedefs before inheritance is resolved, and nodegraphs by name, kept so ``merging(_:)`` only reads the new
+    /// documents.
+    private var unresolvedNodeDefs: [String: NodeDef] = [:]
+    private var graphsByName: [String: NodeGraph] = [:]
+
     /// A library of the nodedefs and functional nodegraphs in `documents`. Later documents override earlier ones.
     public init(documents: [MaterialXDocument]) {
-        self.documents = documents
-        var nodeDefs: [String: NodeDef] = [:]
-        var typeDefs: [ValueType: TypeDef] = [:]
-        var units: [String: [String: Float]] = [:]
-        var geomPropDefs: [String: MaterialXElement] = [:]
-        var nodeGraphs: [String: NodeGraph] = [:]
-        var graphsByName: [String: NodeGraph] = [:]
+        self.documents = []
+        nodeDefs = [:]
+        typeDefs = [:]
+        units = [:]
+        geomPropDefs = [:]
+        nodeGraphs = [:]
+        nodeDefsByCategory = [:]
+        add(documents)
+    }
+
+    /// This library plus the custom nodedefs and nodegraph implementations declared in `documents`. Only the new
+    /// documents are read; inheritance and lookup tables are then rebuilt.
+    public func merging(_ documents: [MaterialXDocument]) -> Self {
+        var library = self
+        library.add(documents)
+        return library
+    }
+
+    private mutating func add(_ newDocuments: [MaterialXDocument]) {
+        documents += newDocuments
         var implementations: [(nodeDef: String, nodeGraph: String)] = []
-        for document in documents {
+        for document in newDocuments {
             for geomPropDef in document.root.children(tag: "geompropdef") {
                 if let name = geomPropDef.name {
                     geomPropDefs[name] = geomPropDef
@@ -68,7 +86,7 @@ public struct StandardLibrary: Sendable {
                 typeDefs[typeDef.name] = typeDef
             }
             for nodeDef in document.nodeDefs {
-                nodeDefs[nodeDef.name] = nodeDef
+                unresolvedNodeDefs[nodeDef.name] = nodeDef
             }
             for graph in document.nodeGraphs {
                 graphsByName[graph.name] = graph
@@ -85,22 +103,14 @@ public struct StandardLibrary: Sendable {
         for (nodeDef, graphName) in implementations {
             nodeGraphs[nodeDef] = nodeGraphs[nodeDef] ?? graphsByName[graphName]
         }
-        self.nodeDefs = nodeDefs.mapValues { Self.resolveInheritance($0, in: nodeDefs) }
-        self.nodeGraphs = nodeGraphs
-        self.typeDefs = typeDefs
-        self.units = units
-        self.geomPropDefs = geomPropDefs
-        nodeDefsByCategory = Dictionary(grouping: self.nodeDefs.values, by: \.node)
+        let unresolved = unresolvedNodeDefs
+        nodeDefs = unresolved.mapValues { Self.resolveInheritance($0, in: unresolved) }
+        nodeDefsByCategory = Dictionary(grouping: nodeDefs.values, by: \.node)
     }
 
     /// The interface input `name` of `graph`: its own `<input>`, or for a functional nodegraph, its nodedef's input.
     public func interfaceInput(_ name: String, of graph: NodeGraph) -> MaterialXInput? {
         graph.input(name) ?? graph.nodeDefName.flatMap { nodeDefs[$0]?.input(name) }
-    }
-
-    /// This library plus the custom nodedefs and nodegraph implementations declared in `documents`.
-    public func merging(_ documents: [MaterialXDocument]) -> Self {
-        Self(documents: self.documents + documents)
     }
 
     static func resolveInheritance(_ nodeDef: NodeDef, in nodeDefs: [String: NodeDef], visited: Set<String> = []) -> NodeDef {

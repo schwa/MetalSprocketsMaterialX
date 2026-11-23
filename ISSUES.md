@@ -1133,12 +1133,13 @@ All four must agree. Any layout change, such as the packing asked about in #24-Q
 ## 60: Document is a raw XML tree plus eagerly copied typed views
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: area:architecture, effort:m, breaking
 created: 2026-11-23T13:37:47Z
-updated: 2026-11-23T13:38:12Z
+updated: 2026-11-23T14:08:44Z
+closed: 2026-11-23T14:08:44Z
 +++
 
 Document (Sources/MaterialX/Document.swift) builds nodeDefs, nodeGraphs and nodes from root once in init. Extensions in Looks.swift and Filenames.swift instead read root on every call. Node, Input and NodeGraph each keep a copy of their Element. Writer.swift serializes only the Element tree.
@@ -1150,6 +1151,7 @@ Consequences:
 - A node editor (#56) needs to edit documents in place.
 
 - `2026-11-23T13:38:12Z`: Related: #56 (node editor needs in-place edits) and #10 (public type naming).
+- `2026-11-23T14:08:44Z`: MaterialXDocument now stores only root; version, colorSpace, typeDefs, nodeDefs, nodeGraphs and nodes are computed from it, so edits to the tree show up in the typed views (malformed elements are still rejected at creation). New setValue(_:input:node:graph:type:) edits an input in place (validated; replaces any connection; adds the input when given a type). StandardLibrary.merging(_:) reads only the new documents (keeps unresolved nodedefs and nodegraphs by name, then re-resolves inheritance and lookup tables) instead of rebuilding from every library document. Breaking: the typed views are get-only. Tests: DocumentEditingTests (typed views follow the tree, setValue, merging keeps the base library and is fast).
 
 ---
 

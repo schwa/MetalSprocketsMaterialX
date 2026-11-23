@@ -306,3 +306,51 @@ struct DocumentWatcherTests {
         guard case .failed = await events.next() else { Issue.record("expected a parse failure"); return }
     }
 }
+
+/// #60: the element tree is the single source of truth, documents can be edited in place, and merging a document
+/// into a library does not rebuild the library from scratch.
+struct DocumentEditingTests {
+    static let source = """
+    <materialx version="1.39"><nodegraph name="g">
+      <constant name="c" type="color3"><input name="value" type="color3" value="1, 0, 0" /></constant>
+      <output name="out" type="color3" nodename="c" />
+    </nodegraph>
+    <standard_surface name="s" type="surfaceshader"><input name="base" type="float" value="0.5" /></standard_surface>
+    </materialx>
+    """
+
+    @Test func typedViewsFollowTheTree() throws {
+        var document = try MaterialXDocument(data: Data(Self.source.utf8))
+        document.root.children.append(MaterialXElement(tag: "nodegraph", attributes: ["name": "added"]))
+        #expect(document.nodeGraphs.map(\.name) == ["g", "added"])
+    }
+
+    @Test func setValueEditsInPlace() throws {
+        var document = try MaterialXDocument(data: Data(Self.source.utf8))
+        try document.setValue("0, 1, 0", input: "value", node: "c", graph: "g")
+        #expect(document.nodeGraph("g")?.nodes["c"]?.input("value")?.value == .numbers([0, 1, 0]))
+        try document.setValue("0.75", input: "base", node: "s")
+        #expect(document.nodes.first { $0.name == "s" }?.input("base")?.value == .numbers([0.75]))
+        // A new input is added when the node does not set it yet.
+        try document.setValue("0.2", input: "metalness", node: "s", type: .float)
+        #expect(document.nodes.first { $0.name == "s" }?.input("metalness")?.value == .numbers([0.2]))
+        #expect(throws: MaterialXError.self) { try document.setValue("1, 2", input: "value", node: "c", graph: "g") }
+        #expect(throws: MaterialXError.self) { try document.setValue("1", input: "x", node: "missing") }
+    }
+
+    @Test func mergingKeepsTheBaseLibraryAndAddsTheDocument() throws {
+        let custom = """
+        <materialx version="1.39"><nodedef name="ND_custom_float" node="custom"><input name="in" type="float" value="0" /><output name="out" type="float" /></nodedef></materialx>
+        """
+        let merged = StandardLibrary.shared.merging([try MaterialXDocument(data: Data(custom.utf8))])
+        #expect(merged.nodeDefs["ND_custom_float"] != nil)
+        #expect(merged.nodeDefs.count == StandardLibrary.shared.nodeDefs.count + 1)
+        #expect(merged.nodeDefs["ND_standard_surface_surfaceshader"]?.outputs.map(\.name) == ["out"]) // inheritance still resolved
+        let start = ContinuousClock.now
+        for _ in 0..<20 {
+            _ = StandardLibrary.shared.merging([try MaterialXDocument(data: Data(custom.utf8))])
+        }
+        // Rebuilding from all ~40 library documents took tens of milliseconds per merge.
+        #expect(ContinuousClock.now - start < .milliseconds(200))
+    }
+}
