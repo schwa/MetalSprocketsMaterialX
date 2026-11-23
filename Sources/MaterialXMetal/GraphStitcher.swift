@@ -96,6 +96,8 @@ public struct StitchedGraph: @unchecked Sendable {
 public struct GraphStitcher {
     public var nodeLibrary: MetalNodeLibrary
     public var standardLibrary: StandardLibrary
+    /// The unit each unit type converts to, such as `["distance": "meter"]`.
+    public var targetUnits: [String: String] = ["distance": "meter", "angle": "degree"]
 
     public init(nodeLibrary: MetalNodeLibrary, standardLibrary: StandardLibrary = .shared) {
         self.nodeLibrary = nodeLibrary
@@ -109,10 +111,10 @@ public struct GraphStitcher {
             guard let graph = document.nodeGraph(graphName) else {
                 throw MaterialXError.invalidDocument("input '\(input.name)' references missing nodegraph '\(graphName)'")
             }
-            return try stitch(graph, output: input.output, functionName: functionName)
+            return try stitch(graph, output: input.output, functionName: functionName, documentColorSpace: document.colorSpace)
         }
         if let nodeName = input.nodeName {
-            return try stitch(Self.documentLevelGraph(document, output: nodeName, type: input.type), functionName: functionName)
+            return try stitch(Self.documentLevelGraph(document, output: nodeName, type: input.type), functionName: functionName, documentColorSpace: document.colorSpace)
         }
         throw MaterialXError.invalidDocument("input '\(input.name)' is not connected")
     }
@@ -125,7 +127,9 @@ public struct GraphStitcher {
         return try NodeGraph(Element(tag: "nodegraph", attributes: ["name": "__document"], children: children))
     }
 
-    public func stitch(_ graph: NodeGraph, output outputName: String? = nil, functionName: String) throws -> StitchedGraph {
+    /// Compiles `graph`'s output. Color constants tagged with a `colorspace` (on the input, its node, the graph, or
+    /// `documentColorSpace`) are converted to lin_rec709; values with a `unit` are converted to ``targetUnits``.
+    public func stitch(_ graph: NodeGraph, output outputName: String? = nil, functionName: String, documentColorSpace: String? = nil) throws -> StitchedGraph {
         guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
             throw MaterialXError.invalidDocument("nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
@@ -133,7 +137,8 @@ public struct GraphStitcher {
             throw MaterialXError.invalidDocument("output '\(output.name)' is not connected")
         }
         var builder = Builder(stitcher: self)
-        let value = try builder.resolve(nodeName: nodeName, output: output.output, in: .init(graph: graph, prefix: "", bindings: nil))
+        let scope = Builder.Scope(graph: graph, prefix: "", bindings: nil, colorSpace: graph.element["colorspace"] ?? documentColorSpace)
+        let value = try builder.resolve(nodeName: nodeName, output: output.output, in: scope)
         let outputNode = try builder.call("mx_output_" + output.type.metalSuffix(), [value, builder.texcoord, builder.parametersArgument])
         let key = functionName + "\n" + builder.topology.joined(separator: "\n")
         let (library, function) = try nodeLibrary.stitchedFunction(key: key) {
@@ -158,6 +163,8 @@ private struct Builder {
         var graph: NodeGraph
         var prefix: String
         var bindings: [String: MTLFunctionStitchingNode]?
+        /// The inherited colorspace for color values. `nil` inside functional nodegraphs, whose constants are raw.
+        var colorSpace: String?
     }
 
     let stitcher: GraphStitcher
@@ -233,7 +240,7 @@ private struct Builder {
                 arguments = cached
             } else {
                 arguments = try nodeDef.inputs.map { definition in
-                    try resolve(input: node.input(definition.name), definition: definition, owner: nodeKey, in: scope)
+                    try resolve(input: node.input(definition.name), definition: definition, owner: nodeKey, nodeColorSpace: node.element["colorspace"] ?? scope.colorSpace, in: scope)
                 }
                 nodeArguments[nodeKey] = arguments
             }
@@ -262,7 +269,7 @@ private struct Builder {
             throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
         if let nodeName = output.nodeName {
-            return try resolve(nodeName: nodeName, output: output.output, in: Scope(graph: graph, prefix: prefix, bindings: bindings))
+            return try resolve(nodeName: nodeName, output: output.output, in: Scope(graph: graph, prefix: prefix, bindings: bindings, colorSpace: nil))
         }
         // A pass-through graph: the output reads an interface input directly.
         if let interfaceName = output.element["interfacename"], let bound = bindings[interfaceName] {
@@ -271,7 +278,7 @@ private struct Builder {
         throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no connected output")
     }
 
-    mutating func resolve(input: Input?, definition: Input, owner: String, in scope: Scope) throws -> MTLFunctionStitchingNode {
+    mutating func resolve(input: Input?, definition: Input, owner: String, nodeColorSpace: String?, in scope: Scope) throws -> MTLFunctionStitchingNode {
         if let upstream = input?.nodeName {
             return try resolve(nodeName: upstream, output: input?.output, in: scope)
         }
@@ -286,11 +293,39 @@ private struct Builder {
             guard let interface = scope.graph.input(interfaceName) else {
                 throw MaterialXError.invalidDocument("nodegraph '\(scope.graph.name)' has no input '\(interfaceName)'")
             }
-            let node = try parameter(name: key, type: interface.type, value: interface.value ?? definition.value)
+            var node = try parameter(name: key, type: interface.type, value: converted(interface.value ?? definition.value, input: interface, definition: definition))
+            node = try convertColor(node, type: interface.type, colorSpace: interface.element["colorspace"] ?? scope.colorSpace, key: key)
             interfaceNodes[key] = node
             return node
         }
-        return try parameter(name: "\(owner).\(definition.name)", type: definition.type, value: input?.value ?? definition.value)
+        let name = "\(owner).\(definition.name)"
+        let value = input.map { converted($0.value ?? definition.value, input: $0, definition: definition) } ?? definition.value
+        let node = try parameter(name: name, type: definition.type, value: value)
+        // Only values the document sets carry its colorspace; nodedef defaults are already linear.
+        guard input?.value != nil else { return node }
+        return try convertColor(node, type: definition.type, colorSpace: input?.element["colorspace"] ?? nodeColorSpace, key: name)
+    }
+
+    /// `node` converted from `colorSpace` to lin_rec709 with the cmlib nodegraph, for color3/color4 values.
+    mutating func convertColor(_ node: MTLFunctionStitchingNode, type: ValueType, colorSpace: String?, key: String) throws -> MTLFunctionStitchingNode {
+        guard type == .color3 || type == .color4, let colorSpace, colorSpace != "lin_rec709", colorSpace != "none" else {
+            return node
+        }
+        let nodeDefName = "ND_\(colorSpace)_to_lin_rec709_\(type)"
+        guard let graph = stitcher.standardLibrary.nodeGraphs[nodeDefName] else {
+            throw MaterialXError.unsupportedNode("colorspace '\(colorSpace)' (\(nodeDefName))")
+        }
+        return try inline(graph, output: nil, bindings: ["in": node], prefix: key + "#colorspace/")
+    }
+
+    /// `value` converted from the input's `unit` to the stitcher's target unit of the same unit type.
+    func converted(_ value: Value?, input: Input, definition: Input) -> Value? {
+        guard let unit = input.element["unit"], let numbers = value?.numbers,
+              let unitType = input.element["unittype"] ?? definition.element["unittype"],
+              let scales = stitcher.standardLibrary.units[unitType], let from = scales[unit],
+              let target = stitcher.targetUnits[unitType], let to = scales[target]
+        else { return value }
+        return .numbers(numbers.map { $0 * from / to })
     }
 
     mutating func parameter(name: String, type: ValueType, value: Value?) throws -> MTLFunctionStitchingNode {

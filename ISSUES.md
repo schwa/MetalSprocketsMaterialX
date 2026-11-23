@@ -79,15 +79,18 @@ ValueType is a string wrapper. Custom <typedef> elements, struct types (1.39), m
 ## 5: Unit and colorspace attributes are not applied
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:l, area:document, area:color
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:12:09Z
+closed: 2026-11-23T13:12:09Z
 +++
 
 colorspace on the document, nodegraph, image and input values, and unit / unittype on distance and angle inputs, are parsed into attributes but have no effect. Values and textures in srgb_texture, acescg, lin_rec709 etc. are used as if already in the working space.
+
+- `2026-11-23T13:12:09Z`: Color3/color4 values set in the document are converted from their colorspace (input > node > nodegraph > document) to lin_rec709 by inlining the cmlib nodegraph; nodedef defaults and functional-graph internals are left alone. Values with unit/unittype convert to GraphStitcher.targetUnits (default meter, degree) using StandardLibrary.units from <unitdef>. Image texture colorspaces wait on image support (#18). Tests: ColorSpaceAndUnitTests.
 
 ---
 

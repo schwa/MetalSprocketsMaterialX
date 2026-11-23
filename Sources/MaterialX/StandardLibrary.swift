@@ -4,6 +4,8 @@ import Foundation
 public struct StandardLibrary: Sendable {
     public var nodeDefs: [String: NodeDef]
     public var typeDefs: [ValueType: TypeDef]
+    /// Unit scales by unit type and unit name, from `<unitdef>`: `units["distance"]["inch"] == 0.0254`.
+    public var units: [String: [String: Float]]
     /// Functional nodegraphs (`*_ng.mtlx`) keyed by the nodedef they implement.
     public var nodeGraphs: [String: NodeGraph]
     private var nodeDefsByCategory: [String: [NodeDef]]
@@ -41,10 +43,19 @@ public struct StandardLibrary: Sendable {
         self.documents = documents
         var nodeDefs: [String: NodeDef] = [:]
         var typeDefs: [ValueType: TypeDef] = [:]
+        var units: [String: [String: Float]] = [:]
         var nodeGraphs: [String: NodeGraph] = [:]
         var graphsByName: [String: NodeGraph] = [:]
         var implementations: [(nodeDef: String, nodeGraph: String)] = []
         for document in documents {
+            for unitDef in document.root.children(tag: "unitdef") {
+                guard let unitType = unitDef["unittype"] else { continue }
+                for unit in unitDef.children(tag: "unit") {
+                    if let name = unit.name, let scale = unit["scale"].flatMap(Float.init) {
+                        units[unitType, default: [:]][name] = scale
+                    }
+                }
+            }
             for typeDef in document.typeDefs {
                 typeDefs[typeDef.name] = typeDef
             }
@@ -69,6 +80,7 @@ public struct StandardLibrary: Sendable {
         self.nodeDefs = nodeDefs.mapValues { Self.resolveInheritance($0, in: nodeDefs) }
         self.nodeGraphs = nodeGraphs
         self.typeDefs = typeDefs
+        self.units = units
         nodeDefsByCategory = Dictionary(grouping: self.nodeDefs.values, by: \.node)
     }
 

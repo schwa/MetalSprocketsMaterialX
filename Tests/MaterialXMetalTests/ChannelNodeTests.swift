@@ -339,3 +339,57 @@ struct ColorManagementTests {
         #expect(simd_distance(SIMD3(value.x, value.y, value.z), [1.70505, -0.13026, -0.02400]) < 1e-3, "\(value)")
     }
 }
+
+/// #5: colorspace and unit attributes on values are applied.
+@Suite(.serialized)
+struct ColorSpaceAndUnitTests {
+    func evaluate(_ xml: String, type: String = "color3", configure: (inout GraphStitcher) -> Void = { _ in }) throws -> SIMD4<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(xml.utf8))
+        var stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        configure(&stitcher)
+        let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph", documentColorSpace: document.colorSpace)
+        return try StitchingTests().evaluate(stitched, device: device, returnType: type)[0]
+    }
+
+    static let decoded = pow((0.5 + 0.055) / 1.055, 2.4) as Float
+
+    @Test func documentColorSpaceConvertsConstants() throws {
+        let value = try evaluate("""
+        <materialx version="1.39" colorspace="srgb_texture"><nodegraph name="g">
+          <add name="n" type="color3"><input name="in1" type="color3" value="0.5, 0.5, 0.5" /></add>
+          <output name="out" type="color3" nodename="n" />
+        </nodegraph></materialx>
+        """)
+        // in1 is converted; the unset in2 default (0) is not.
+        #expect(abs(value.x - Self.decoded) < 1e-5, "\(value)")
+    }
+
+    @Test func inputColorSpaceOverridesAndLinearIsUntouched() throws {
+        let value = try evaluate("""
+        <materialx version="1.39" colorspace="srgb_texture"><nodegraph name="g" colorspace="lin_rec709">
+          <input name="tint" type="color3" value="0.5, 0.5, 0.5" colorspace="srgb_texture" />
+          <add name="n" type="color3">
+            <input name="in1" type="color3" interfacename="tint" />
+            <input name="in2" type="color3" value="0.25, 0.25, 0.25" />
+          </add>
+          <output name="out" type="color3" nodename="n" />
+        </nodegraph></materialx>
+        """)
+        #expect(abs(value.x - (Self.decoded + 0.25)) < 1e-5, "\(value)")
+    }
+
+    @Test func unitsConvertToTarget() throws {
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <multiply name="n" type="float">
+            <input name="in1" type="float" value="10" unit="centimeter" unittype="distance" />
+            <input name="in2" type="float" value="1" />
+          </multiply>
+          <output name="out" type="float" nodename="n" />
+        </nodegraph></materialx>
+        """
+        #expect(abs(try evaluate(xml, type: "float").x - 0.1) < 1e-6)
+        #expect(abs(try evaluate(xml, type: "float") { $0.targetUnits["distance"] = "millimeter" }.x - 100) < 1e-4)
+    }
+}
