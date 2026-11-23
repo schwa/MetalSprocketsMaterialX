@@ -188,6 +188,8 @@ private extension ValueType {
         case .vector2: "vector2"
         case .vector3, .color3: "vector3"
         case .vector4, .color4: "vector4"
+        case .integer: "integer"
+        case .boolean: "boolean"
         default: throw MaterialXError.unsupportedNode("value of type \(self)")
         }
     }

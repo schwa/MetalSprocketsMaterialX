@@ -178,15 +178,18 @@ StandardLibrary.metal covers add, subtract, multiply, divide, min, max, mix, com
 ## 12: Channel and conversion nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, area:nodes
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T12:59:03Z
+closed: 2026-11-23T12:59:03Z
 +++
 
 extract, separate2/3/4, combine2/4, swizzle (1.38 compat), convert for all type pairs, and the FA/vector variants are mostly absent from StandardLibrary.metal.
+
+- `2026-11-23T12:59:03Z`: Added Metal functions for every extract, combine2/3/4 and convert nodedef (except *_surfaceshader), plus integer/boolean parameter readers. separate2/3/4 are multi-output nodes and wait on #25. swizzle is not in the 1.39 libraries. Tests: ChannelNodeTests.
 
 ---
 

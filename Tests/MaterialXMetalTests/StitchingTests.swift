@@ -28,17 +28,25 @@ struct StitchingTests {
     </materialx>
     """
 
-    static let kernelSource = """
-    #include <metal_stdlib>
-    using namespace metal;
-    [[visible]] float3 materialx_graph(float2 texcoord, constant float4 *parameters);
-    kernel void evaluate(device float4 *out [[buffer(0)]], constant float4 *parameters [[buffer(1)]], uint id [[thread_position_in_grid]]) {
-        out[id] = float4(materialx_graph(float2(id, 0) / 4.0, parameters), 1);
+    /// A kernel that calls the stitched graph and widens its `returnType` result to float4 (missing components 0, w 1).
+    static func kernelSource(returnType: String) -> String {
+        let metalType = ["float": "float", "vector2": "float2", "vector3": "float3", "color3": "float3", "vector4": "float4", "color4": "float4"][returnType] ?? returnType
+        return """
+        #include <metal_stdlib>
+        using namespace metal;
+        static float4 widen(float v) { return float4(v, 0, 0, 1); }
+        static float4 widen(float2 v) { return float4(v, 0, 1); }
+        static float4 widen(float3 v) { return float4(v, 1); }
+        static float4 widen(float4 v) { return v; }
+        [[visible]] \(metalType) materialx_graph(float2 texcoord, constant float4 *parameters);
+        kernel void evaluate(device float4 *out [[buffer(0)]], constant float4 *parameters [[buffer(1)]], uint id [[thread_position_in_grid]]) {
+            out[id] = widen(materialx_graph(float2(id, 0) / 4.0, parameters));
+        }
+        """
     }
-    """
 
-    func evaluate(_ graph: StitchedGraph, device: MTLDevice) throws -> [SIMD4<Float>] {
-        let library = try device.makeLibrary(source: Self.kernelSource, options: nil)
+    func evaluate(_ graph: StitchedGraph, device: MTLDevice, returnType: String = "color3") throws -> [SIMD4<Float>] {
+        let library = try device.makeLibrary(source: Self.kernelSource(returnType: returnType), options: nil)
         let descriptor = MTLComputePipelineDescriptor()
         descriptor.computeFunction = library.makeFunction(name: "evaluate")
         let linked = MTLLinkedFunctions()
