@@ -1217,9 +1217,9 @@ status: open
 priority: low
 kind: feature
 labels: area:nodes, area:integration, effort:l
-depends: 46
+depends: 46, 37
 created: 2026-11-23T14:17:55Z
-updated: 2026-11-23T14:18:00Z
+updated: 2026-11-23T14:48:13Z
 +++
 
 With Apple's nodedefs loaded (StandardLibrary.addingAppleShaderGraphNodes, #46), these RealityKit nodes used by Reality Composer Pro assets on this Mac still fail with unsupportedNode:
@@ -1228,6 +1228,10 @@ With Apple's nodedefs loaded (StandardLibrary.addingAppleShaderGraphNodes, #46),
 - realitykit_environment_radiance (3 uses): needs lighting (#37)
 - realitykit_image (56 nodedefs), MTL_* bitwise/integer ops, and the other ~1,400 Apple nodedefs
 The tangent-space normal input of realitykit_pbr_surfaceshader is not mapped either.
+
+- `2026-11-23T14:48:13Z`: Done: realitykit_unlit_surfaceshader (19 uses) via stitchUnlit; color and opacity are used, applyPostProcessToneMap/hasPremultipliedAlpha are not. realitykit_image (56 nodedefs) is marked deprecated by Apple ('will be removed in future releases of Reality Composer Pro') and the RCP assets on this Mac use the standard image node instead.
+- `2026-11-23T14:48:13Z`: Question 1 (design): RealityKit geometry modifiers (geometrymodifier / geometrymodifier_2_0 vertexshader, 24 uses) run in the vertex stage. Add a second stitched function kind for MaterialXUnlitSurface's vertex shader (position/normal/UV/color offsets in, modified attributes out) rather than leaving them unsupported? Recommended: Yes, a vertex-stage stitched function
+- `2026-11-23T14:48:13Z`: Question 2 (decision): Skip the deprecated realitykit_image family and the MTL_* integer/bitwise ops (no use in RCP assets on this Mac) and close #62 once geometry modifiers land, leaving realitykit_environment_radiance to #37? Recommended: Yes
 
 ---
 
@@ -1389,6 +1393,8 @@ created: 2026-11-23T14:32:25Z
 
 bsdf, edf and vdf typed values (pbrlib closures) cannot be passed between stitched functions. Acceptance: a closure representation exists that closure nodes can produce and consume, and a minimal closure graph stitches. Part of #33.
 
+- `2026-11-23T14:47:21Z`: Question 1 (design): MaterialX's GLSL evaluates BSDF closures against a light direction inside the shader, which conflicts with #37 (lighting comes from the PBR renderer). Should closures instead be represented as weighted lobes reduced to MXSurfaceInputs (dielectric/conductor/sheen/coat/emission layered and mixed into baseColor, metallic, roughness, clearcoat, sheen, emissive…), so closure graphs like lama_* and raw pbrlib networks feed the same PBR path? Recommended: Yes, reduce closures to MXSurfaceInputs lobes; no in-shader light loop
+
 ---
 
 ## 72: pbrlib BSDF nodes are missing
@@ -1439,26 +1445,34 @@ surface, surfacematerial, volume, volumematerial and the lama_* shaders have no 
 ## 75: Codebase not yet reviewed for Swift concurrency adoption
 
 +++
-status: new
-priority: none
-kind: none
+status: open
+priority: medium
+kind: task
+labels: effort:m, area:architecture
 created: 2026-11-23T14:35:19Z
+updated: 2026-11-23T14:57:15Z
 +++
 
 Do a swift concurrency pass.
 
+- `2026-11-23T14:57:15Z`: Related: MetalNodeLibrary and StitchedGraph are @unchecked Sendable, GraphStitcher/Builder are value types used synchronously, DocumentWatcher uses an AsyncStream with a polling Task, and MaterialXDemoModel is @MainActor.
+
 ---
 
-## 76: Performance not benchmarked or syst
+## 76: Performance not benchmarked or systematically optimized
 
 +++
-status: new
-priority: none
-kind: none
+status: open
+priority: medium
+kind: task
+labels: effort:l, area:performance
 created: 2026-11-23T14:35:39Z
+updated: 2026-11-23T14:57:15Z
 +++
 
 Do a performance pass. Benchmark then autoresearch.
+
+- `2026-11-23T14:57:15Z`: Related: #28 added StitchingPerformanceTests (stitch/link/GPU timings, MX_STITCHING_TIMINGS=1) and #30 constant folding; nothing tracks numbers over time or covers document loading, validation or library merging.
 
 ---
 
@@ -1479,25 +1493,33 @@ ND_heighttonormal_vector3 still fails with unsupportedNode. MaterialX's implemen
 ## 78: No continuous integration pipeline configured
 
 +++
-status: new
+status: closed
 priority: none
-kind: none
+kind: task
 created: 2026-11-23T14:41:52Z
+updated: 2026-11-23T14:57:15Z
+closed: 2026-11-23T14:57:15Z
 +++
 
 Set up CI
+
+- `2026-11-23T14:57:15Z`: Duplicate of #51 (closed): .github/workflows/swift.yml already runs SwiftLint, macOS build and tests with warnings as errors, and iOS/visionOS builds.
 
 ---
 
 ## 79: Missing SwiftLint configuration for the project
 
 +++
-status: new
+status: closed
 priority: none
-kind: none
+kind: task
 created: 2026-11-23T14:42:05Z
+updated: 2026-11-23T14:57:15Z
+closed: 2026-11-23T14:57:15Z
 +++
 
 Set up swiftlint
+
+- `2026-11-23T14:57:15Z`: Duplicate of #51 (closed): .swiftlint.yml exists (strict config shared with the sibling packages), swiftlint --strict passes, and CI runs it. Demos/MaterialXDemo has its own config.
 
 ---
