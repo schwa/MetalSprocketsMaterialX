@@ -895,3 +895,49 @@ struct SurfaceTranslationTests {
         #expect(errors.isEmpty, "\(errors)")
     }
 }
+
+/// #30: opt-in constant folding evaluates constant-only subgraphs once.
+@Suite(.serialized)
+struct ConstantFoldingTests {
+    static let source = """
+    <materialx version="1.39"><nodegraph name="g">
+      <input name="tint" type="color3" value="0.5, 0.25, 1" />
+      <multiply name="scaled" type="color3">
+        <input name="in1" type="color3" interfacename="tint" />
+        <input name="in2" type="float" value="0.5" />
+      </multiply>
+      <add name="brighter" type="color3">
+        <input name="in1" type="color3" nodename="scaled" />
+        <input name="in2" type="float" value="0.25" />
+      </add>
+      <texcoord name="uv" type="vector2" />
+      <extract name="u" type="float"><input name="in" type="vector2" nodename="uv" /><input name="index" type="integer" value="0" /></extract>
+      <multiply name="n" type="color3">
+        <input name="in1" type="color3" nodename="brighter" />
+        <input name="in2" type="float" nodename="u" />
+      </multiply>
+      <output name="out" type="color3" nodename="n" />
+    </nodegraph></materialx>
+    """
+
+    @Test func foldedGraphMatchesAndIsSmaller() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let graph = try #require(try MaterialXDocument(data: Data(Self.source.utf8)).nodeGraph("g"))
+        var stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let plain = try stitcher.stitch(graph, functionName: "plain")
+        stitcher.foldConstants = true
+        let folded = try stitcher.stitch(graph, functionName: "folded")
+
+        let texcoords: [SIMD2<Float>] = [[0, 0], [0.5, 0], [1, 0]]
+        let expected = try plain.evaluate(at: texcoords)
+        let actual = try folded.evaluate(at: texcoords)
+        for (a, e) in zip(actual, expected) {
+            #expect(simd_distance(a, e) < 1e-6, "\(a) vs \(e)")
+        }
+        #expect(!folded.graphDescription.contains("mx_add_color3FA"))
+        #expect(folded.parameter("brighter#folded") != nil)
+        #expect(folded.parameter("tint") == nil)
+        #expect(folded.parameter("n.in2") == nil) // was never a parameter
+        #expect(folded.parameter("u.index") != nil) // a bare parameter read is not folded
+    }
+}

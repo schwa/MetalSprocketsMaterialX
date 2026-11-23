@@ -549,18 +549,20 @@ When makeLibrary(stitchedDescriptor:) fails, the error names the stitching graph
 ## 30: Constant folding before stitching is not done
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: effort:m, area:stitching, area:performance
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:06:18Z
+closed: 2026-11-23T14:06:18Z
 +++
 
 Subgraphs that depend only on constants are stitched as function calls and evaluated per pixel. SceneSprocketsMaterialX already folds math on constants on the CPU (#609 in SceneSprockets).
 
 - `2026-11-23T13:31:01Z`: Question 1 (design): Add an opt-in GraphStitcher.foldConstants that stitches each constant-only subgraph separately, evaluates it once on the GPU with a 1-thread compute dispatch, and replaces it with one parameter slot (so no CPU copy of node semantics is needed), accepting that folded inputs are no longer editable by their original parameter names? Recommended: Yes, opt-in, GPU-evaluated
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:06:18Z`: Per #30-Q1: opt-in GraphStitcher.foldConstants (off by default). foldingConstants(_ plan:) finds the largest constant-only subgraphs (no context or texture dependence) that feed non-constant calls, stitches each as its own graph, evaluates it once on the GPU (no CPU copy of node semantics), and replaces it with one parameter '<node>#folded'; unreachable calls are removed and parameters no longer read are dropped from the names list (their slots stay). Plans now record each call's value type; parameter readers carry their parameter's name. Test: ConstantFoldingTests (folded and unfolded graphs agree; the constant add disappears; 'tint' is no longer a parameter).
 
 ---
 

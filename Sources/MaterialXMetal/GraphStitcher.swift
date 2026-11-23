@@ -145,6 +145,9 @@ public struct GraphStitcher {
     public var standardLibrary: StandardLibrary
     /// The unit each unit type converts to, such as `["distance": "meter"]`.
     public var targetUnits: [String: String] = ["distance": "meter", "angle": "degree"]
+    /// Evaluate constant-only subgraphs once when stitching. Off by default: folded constants can no longer be edited
+    /// by name.
+    public var foldConstants = false
 
     public init(nodeLibrary: MetalNodeLibrary, standardLibrary: StandardLibrary = .shared) {
         self.nodeLibrary = nodeLibrary
@@ -198,8 +201,10 @@ public struct GraphStitcher {
         return GraphPlan(functionName: functionName, outputType: output.type, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)
     }
 
-    /// Builds `plan` with Metal function stitching, reusing a cached library when the wiring matches.
+    /// Builds `plan` with Metal function stitching, reusing a cached library when the wiring matches. With
+    /// ``foldConstants``, constant-only subgraphs are evaluated first (``foldingConstants(_:)``).
     public func stitch(_ plan: GraphPlan) throws -> StitchedGraph {
+        let plan = foldConstants ? try foldingConstants(plan) : plan
         let (library, function) = try nodeLibrary.stitchedFunction(key: plan.topologyKey) {
             try nodeLibrary.makeStitchedFunction(plan)
         }
@@ -231,6 +236,8 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
         public var arguments: [Operand]
         /// The MaterialX node (scoped as `graph-node/inner-node`) this call implements, if any.
         public var origin: String?
+        /// The MaterialX type of the call's result, when it is a value (not a parameter pointer or surface).
+        public var valueType: ValueType?
     }
 
     public var functionName: String
@@ -529,8 +536,14 @@ struct Builder {
         case let .unsupported(reason):
             throw MaterialXError.unsupportedNode(reason)
         }
-        if case let .call(index) = stitchingNode, calls[index].origin == nil {
-            calls[index].origin = key
+        if case let .call(index) = stitchingNode {
+            if calls[index].origin == nil {
+                calls[index].origin = key
+            }
+            if calls[index].valueType == nil {
+                let outputType = node.type == .multioutput ? nodeDef.outputs.first { $0.name == outputName }?.type : node.type
+                calls[index].valueType = outputType
+            }
         }
         resolved[key] = stitchingNode
         return stitchingNode
@@ -600,6 +613,7 @@ struct Builder {
         let call = try call("mx_\(category)_\(type)", arguments)
         if case let .call(index) = call {
             calls[index].origin = key + "#" + name
+            calls[index].valueType = ValueType(rawValue: type)
         }
         return call
     }
@@ -636,7 +650,13 @@ struct Builder {
         previousSlotCount = slots.count
         parameters.append(.init(name: name, type: type, slot: parameterData.count, slotCount: slots.count))
         parameterData += slots
-        return try call(reader, [slotPointer])
+        let read = try call(reader, [slotPointer])
+        if case let .call(index) = read {
+            // Readers carry their parameter's name, so constant folding can tell which parameters are still read.
+            calls[index].origin = name
+            calls[index].valueType = type
+        }
+        return read
     }
 
     /// The float4 slots holding a value: one for scalars and vectors, one per column (3 or 4 floats) for matrices.
