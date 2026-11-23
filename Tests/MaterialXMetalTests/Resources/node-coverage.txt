@@ -24,6 +24,7 @@ ND_add_color3FA metal
 ND_add_color4 metal
 ND_add_color4FA metal
 ND_add_float metal
+ND_add_integer metal
 ND_add_matrix33 metal
 ND_add_matrix33FA metal
 ND_add_matrix44 metal
@@ -634,6 +635,7 @@ ND_subtract_color3FA metal
 ND_subtract_color4 metal
 ND_subtract_color4FA metal
 ND_subtract_float metal
+ND_subtract_integer metal
 ND_subtract_matrix33 metal
 ND_subtract_matrix33FA metal
 ND_subtract_matrix44 metal
@@ -666,6 +668,7 @@ ND_tan_vector3 metal
 ND_tan_vector4 metal
 ND_tangent_vector3 metal
 ND_texcoord_vector2 metal
+ND_texcoord_vector3 metal
 ND_tiledcircles_color3 nodeGraph
 ND_tiledcloverleafs_color3 nodeGraph
 ND_tiledhexagons_color3 nodeGraph

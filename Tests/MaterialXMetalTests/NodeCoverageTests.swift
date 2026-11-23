@@ -76,3 +76,14 @@ struct InverseTrigonometryTests {
         }
     }
 }
+
+/// #11: with its subtasks done, no non-shader stdlib math or geometry node is left unsupported.
+struct MathCoverageTests {
+    @Test func remainingMathNodesAreSupported() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let coverage = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device)).coverage()
+        for name in ["ND_add_integer", "ND_subtract_integer", "ND_texcoord_vector3", "ND_trianglewave_float", "ND_distance_vector3", "ND_reflect_vector3", "ND_refract_vector3"] where StandardLibrary.shared.nodeDefs[name] != nil {
+            #expect(coverage[name] != .unsupported, "\(name)")
+        }
+    }
+}

@@ -191,18 +191,20 @@ Types are named Element, Node, Input, Output, Value, Document in module Material
 ## 11: Most stdlib math nodes have no Metal implementation
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:xl, area:nodes, area:stitching, has-subtasks
 depends: 63, 64, 65, 66
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:47:08Z
+closed: 2026-11-23T14:47:08Z
 +++
 
 StandardLibrary.metal covers add, subtract, multiply, divide, min, max, mix, combine3 and two converts. stdlib_defs.mtlx has ~690 nodedefs. Missing math: modulo, fract, invert, absval, sign, floor, ceil, round, power, safepower, sin/cos/tan/asin/acos/atan2, sqrt, ln, exp, clamp, normalize, magnitude, distance, dotproduct, crossproduct, transformpoint/vector/normal, transformmatrix, normalmap, creatematrix, transpose, determinant, invertmatrix, rotate2d, rotate3d, reflect, refract, place2d, trianglewave, etc.
 
 - `2026-11-23T14:11:39Z`: Partly done along the way (#47 and earlier): absval, sign, clamp, sqrt, floor, ceil, round, fract, sin, cos, tan, ln, exp, modulo, power, dotproduct, transformmatrix. Coverage baseline tracks the rest.
+- `2026-11-23T14:47:08Z`: All subtasks done (#63 inverse trig, #64 matrices, #65 space transforms, #66 UV/normal maps) plus integer add/subtract and texcoord_vector3 (W = 0: the context has 2D texture coordinates). No non-shader stdlib math or geometry nodedef is unsupported any more (MathCoverageTests); heighttonormal is #77, pbrlib helpers (artistic_ior, blackbody, bump, roughness_dual, hair) belong with the closure work under #33.
 
 ---
 
@@ -263,16 +265,19 @@ remap, smoothstep, luminance, rgbtohsv, hsvtorgb, contrast, range, hsvadjust, sa
 ## 15: Procedural pattern nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:xl, area:nodes, has-subtasks
 depends: 67, 68, 69, 70
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:47:08Z
+closed: 2026-11-23T14:47:08Z
 +++
 
 noise2d, noise3d, fractal2d/3d, cellnoise2d/3d, worleynoise2d/3d, unifiednoise2d/3d, ramplr, ramptb, ramp4, splitlr, splittb, randomfloat, randomcolor, checkerboard, line, circle, cloverleaf, hexagon, grid, crosshatch, tiledcircles, tiledcloverleafs, tiledhexagons, bump have no implementation. MaterialX's genmsl lib (mx_noise.metal etc.) is available on disk for reference.
+
+- `2026-11-23T14:47:08Z`: All subtasks done: #67 Perlin/fractal/cell noise, #68 Worley/unified noise, #69 ramps and splits, #70 random nodes; the shape patterns already stitched through their nodegraphs. Every procedural nodedef is supported.
 
 ---
 

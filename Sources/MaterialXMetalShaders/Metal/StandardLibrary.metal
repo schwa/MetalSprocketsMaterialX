@@ -136,6 +136,8 @@ MX_EVALUATE(boolean, bool, float4(value ? 1.0 : 0.0, 0, 0, 1))
 
 // Geometric nodes take the shading context as their first argument, before the nodedef's inputs.
 [[stitchable]] float2 mx_texcoord_vector2(MXContext context, int index) { return context.texcoord[clamp(index, 0, 1)]; }
+// The context carries 2D texture coordinates only, so W is 0.
+[[stitchable]] float3 mx_texcoord_vector3(MXContext context, int index) { return float3(context.texcoord[clamp(index, 0, 1)], 0); }
 
 // `space` arrives as an integer: 0 object (and model), 1 world, -1 unset. See Builder.spaceCode.
 
@@ -335,6 +337,9 @@ MX_UNARY(cos, cos(in))
 MX_UNARY(tan, tan(in))
 MX_UNARY(ln, log(in))
 MX_UNARY(asin, asin(in))
+[[stitchable]] int mx_add_integer(int in1, int in2) { return in1 + in2; }
+[[stitchable]] int mx_subtract_integer(int in1, int in2) { return in1 - in2; }
+
 // The integer-output variants (ND_floor_integer etc.), from MaterialX's int(floor(in)) and so on.
 [[stitchable]] int mx_floor_integer(float in) { return int(floor(in)); }
 [[stitchable]] int mx_ceil_integer(float in) { return int(ceil(in)); }
