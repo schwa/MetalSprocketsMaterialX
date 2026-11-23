@@ -458,7 +458,7 @@ struct GraphDescriptionTests {
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
         let description = stitched.graphDescription
-        #expect(description.hasPrefix("materialx_graph(arg0: texcoord, arg1: parameters):"))
+        #expect(description.hasPrefix("materialx_graph(arg0: context, arg1: parameters):"))
         #expect(description.contains("mx_multiply_color3FA(") && description.contains("// scaled"))
         #expect(description.contains("mx_mix_color3(") && description.contains("// blend"))
         #expect(description.contains("mx_output_vector3("))
@@ -500,7 +500,7 @@ struct GraphPlanTests {
         let multiplyIndex = try #require(plan.calls.firstIndex(of: multiply))
         #expect(mix.arguments.first == .call(multiplyIndex))
         #expect(plan.calls.last?.function == "mx_output_vector3")
-        #expect(plan.calls.last?.arguments.suffix(2) == [.texcoord, .parameters])
+        #expect(plan.calls.last?.arguments.suffix(2) == [.context, .parameters])
     }
 
     @Test func colorspaceConversionIsInlinedIntoThePlan() throws {
@@ -536,5 +536,35 @@ struct EvaluateTests {
         let values = try stitched.evaluate(at: [[0.25, 0], [0.75, 0], [0.9, 0]])
         #expect(values.map(\.x) == [0, 1, 1])
         #expect(try stitched.evaluate(at: []).isEmpty)
+    }
+}
+
+/// #22: graphs take an MXShadingContext; Swift and Metal agree on its layout.
+@Suite(.serialized)
+struct ShadingContextTests {
+    @Test func contextFieldsReachTheGraph() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <texcoord name="n" type="vector2"><input name="index" type="integer" value="0" /></texcoord>
+          <output name="out" type="vector2" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        var context = MXShadingContext(texcoord: [0.25, 0.75])
+        context.time = 99
+        context.vertexColor = [9, 9, 9, 9] // Fields after texcoord must not shift it.
+        let value = try #require(try stitched.evaluate(contexts: [context]).first)
+        #expect(value == [0.25, 0.75, 0, 1])
+        #expect(stitched.graphDescription.contains("mx_texcoord_vector2(arg0,"))
+    }
+
+    @Test func signatureIsContextThenParameters() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let plan = try stitcher.plan(try #require(Document(data: Data(StitchingTests.document.utf8)).nodeGraph("NG_test")), functionName: "f")
+        #expect(plan.description.hasPrefix("f(arg0: context, arg1: parameters):"))
+        #expect(StitchedGraph.Argument.context.rawValue == 0)
     }
 }

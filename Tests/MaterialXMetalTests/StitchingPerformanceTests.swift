@@ -23,24 +23,40 @@ struct StitchingPerformanceTests {
         return (xml, metal)
     }
 
-    static let kernel = """
-    #include <metal_stdlib>
+    /// MXShadingContext.h, read from the source tree, so runtime-compiled kernels match the stitched signature.
+    static let contextHeader: String = {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../Sources/MaterialXMetalShaders/include/MXShadingContext.h")
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }()
+
+    static let contextPrelude = """
+    \(contextHeader)
     using namespace metal;
-    [[visible]] float3 materialx_graph(float2 texcoord, constant float4 *parameters);
+    static MXShadingContext contextAt(uint id) {
+        MXShadingContext context = {};
+        context.texcoord[0] = float2(id & 1023, id >> 10) / 1024.0;
+        return context;
+    }
+
+    """
+
+    static let kernel = contextPrelude + """
+    [[visible]] float3 materialx_graph(thread const MXShadingContext &context, constant float4 *parameters);
     kernel void evaluate(device float4 *out [[buffer(0)]], constant float4 *parameters [[buffer(1)]], uint id [[thread_position_in_grid]]) {
-        out[id] = float4(materialx_graph(float2(id & 1023, id >> 10) / 1024.0, parameters), 1);
+        MXShadingContext context = contextAt(id);
+        out[id] = float4(materialx_graph(context, parameters), 1);
     }
     """
 
     /// Calls the graph through a visible function table, as MetalSprockets' `.binary` linking does. Binary functions
     /// cannot satisfy a direct `[[visible]]` call ("unresolved visible function reference").
-    static let tableKernel = """
-    #include <metal_stdlib>
-    using namespace metal;
-    using Graph = float3(float2, constant float4 *);
+    static let tableKernel = contextPrelude + """
+    using Graph = float3(thread const MXShadingContext &, constant float4 *);
     kernel void evaluate(device float4 *out [[buffer(0)]], constant float4 *parameters [[buffer(1)]],
                          visible_function_table<Graph> table [[buffer(2)]], uint id [[thread_position_in_grid]]) {
-        out[id] = float4(table[0](float2(id & 1023, id >> 10) / 1024.0, parameters), 1);
+        MXShadingContext context = contextAt(id);
+        out[id] = float4(table[0](context, parameters), 1);
     }
     """
 

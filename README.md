@@ -45,8 +45,13 @@ let function = try graph.visibleFunction() // a MetalSprockets VisibleFunction
 ### The stitched function
 
 ```metal
-[[visible]] T graph(float2 texcoord, constant float4 *parameters);
+#include "MXShadingContext.h" // from MaterialXMetalShaders
+[[visible]] T graph(thread const MXShadingContext &context, constant float4 *parameters);
 ```
+
+- `context` is the surface point: world and object position, normal, tangent and bitangent, view direction, two UV
+  sets, vertex color, time and frame. The caller (a fragment shader) fills it in; geometric nodes read it.
+  `StitchedGraph.evaluate(contexts:)` runs a graph for given contexts; `evaluate(at:)` builds them from UVs.
 
 - `T` is the Metal type of the output (`float`, `float2`, `float3` for vector3/color3, `float4`, `int`, `bool`).
 - `parameters` holds every constant input, one `float4` slot each (matrices take one slot per column). Bind

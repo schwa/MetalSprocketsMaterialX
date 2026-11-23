@@ -64,7 +64,8 @@ public final class MetalNodeLibrary: @unchecked Sendable {
 
 /// A nodegraph output compiled into one visible function with `MTLFunctionStitchingGraph`.
 ///
-/// Signature: `T functionName(float2 texcoord, constant float4 *parameters)`, where `T` is the Metal type of
+/// Signature: `T functionName(thread const MXShadingContext &context, constant float4 *parameters)` (see
+/// `MXShadingContext.h`), where `T` is the Metal type of
 /// ``outputType``. ``parameterData`` holds the constant inputs; edit it (by ``parameters``) to change values without
 /// re-stitching.
 public struct StitchedGraph: @unchecked Sendable {
@@ -79,7 +80,7 @@ public struct StitchedGraph: @unchecked Sendable {
     }
 
     public enum Argument: Int, CaseIterable, Sendable {
-        case texcoord = 0
+        case context = 0
         case parameters = 1
     }
 
@@ -186,7 +187,7 @@ public struct GraphStitcher {
         var builder = Builder(stitcher: self)
         let scope = Builder.Scope(graph: graph, prefix: "", bindings: [:], colorSpace: graph.element["colorspace"] ?? documentColorSpace)
         let value = try builder.resolve(nodeName: nodeName, output: output.output, in: scope)
-        _ = try builder.call("mx_output_" + output.type.metalSuffix(), [value, .texcoord, .parameters])
+        _ = try builder.call("mx_output_" + output.type.metalSuffix(), [value, .context, .parameters])
         return GraphPlan(functionName: functionName, outputType: output.type, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData)
     }
 
@@ -205,8 +206,8 @@ public struct GraphStitcher {
 /// A compiled nodegraph before Metal sees it: function calls in dependency order, the last being the output.
 public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
     public enum Operand: Hashable, Sendable {
-        /// Argument 0 of the stitched function.
-        case texcoord
+        /// Argument 0 of the stitched function: the `MXShadingContext`.
+        case context
         /// Argument 1 of the stitched function, or the parameter pointer before it is advanced.
         case parameters
         /// The result of `calls[index]`.
@@ -240,13 +241,13 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
         let lines = calls.enumerated().map { index, call in
             "  n\(index) = \(Self.line(call))" + (call.origin.map { "  // \($0)" } ?? "")
         }
-        return "\(functionName)(arg0: texcoord, arg1: parameters):\n" + lines.joined(separator: "\n")
+        return "\(functionName)(arg0: context, arg1: parameters):\n" + lines.joined(separator: "\n")
     }
 
     static func line(_ call: Call) -> String {
         let arguments = call.arguments.map { operand in
             switch operand {
-            case .texcoord: "arg0"
+            case .context: "arg0"
             case .parameters: "arg1"
             case let .call(index): "n\(index)"
             }
@@ -258,7 +259,7 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
 extension MetalNodeLibrary {
     func makeStitchedFunction(_ plan: GraphPlan) throws -> (MTLLibrary, MTLFunction) {
         let inputs = [
-            GraphPlan.Operand.texcoord: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.texcoord.rawValue),
+            GraphPlan.Operand.context: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.context.rawValue),
             .parameters: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.parameters.rawValue),
         ]
         var nodes: [MTLFunctionStitchingFunctionNode] = []
@@ -315,6 +316,9 @@ private struct Builder {
     /// The pointer to the current parameter slot.
     var slotPointer = GraphPlan.Operand.parameters
     var previousSlotCount = 0
+
+    /// Node categories whose functions take the shading context before the nodedef's inputs.
+    static let contextCategories: Set<String> = ["texcoord", "position", "normal", "tangent", "bitangent", "geomcolor", "viewdirection", "time", "frame"]
 
     init(stitcher: GraphStitcher) {
         self.stitcher = stitcher
@@ -394,7 +398,9 @@ private struct Builder {
             if let index = node.input("index")?.value?.numbers?.first, index != 0 {
                 throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'")
             }
-            stitchingNode = try call(functionName, [.texcoord])
+            stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
+        case let .function(functionName) where Self.contextCategories.contains(node.category):
+            stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
         case let .function(functionName):
             stitchingNode = try call(functionName, nodeDef.inputs.map(argument))
         case let .nodeGraph(implementation):

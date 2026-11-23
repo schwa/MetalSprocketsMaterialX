@@ -382,12 +382,13 @@ Each Metal node implementation is written by hand. Nothing compares its output a
 ## 22: Stitched graph signature only carries texcoord and parameters
 
 +++
-status: open
+status: closed
 priority: critical
 kind: feature
 labels: effort:m, area:stitching, area:geometry
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:46:33Z
+closed: 2026-11-23T13:46:33Z
 +++
 
 The stitched function is T(float2 texcoord, constant float4 *parameters). There is no way to pass position, normal, tangent, view direction, time, vertex color, or multiple UV sets. Changing it later breaks every caller, so the shading context needs to be designed before more nodes are added.
@@ -395,6 +396,7 @@ The stitched function is T(float2 texcoord, constant float4 *parameters). There 
 - `2026-11-23T12:56:14Z`: Question 1 (design): Should the stitched function become T graph(thread const MXShadingContext &context, constant float4 *parameters), with MXShadingContext (world/object position and normal, tangent, bitangent, view direction, texcoord[2], vertex color, time, frame) in a shared header? Recommended: Yes
 - `2026-11-23T13:38:12Z`: Related: #61 (evaluation kernels hard-code the current signature).
 - `2026-11-23T13:40:51Z`: Answer 1: YES
+- `2026-11-23T13:46:33Z`: Stitched graphs are now T graph(thread const MXShadingContext &context, constant float4 *parameters). MXShadingContext (MaterialXMetalShaders/include/MXShadingContext.h, shared by Metal and Swift, re-exported by MetalSprocketsMaterialX): world/object position, normal, tangent, bitangent, view direction, texcoord[2], vertex color, time, frame. Geometric node functions take the context first; mx_texcoord_vector2 now reads context.texcoord[index]. StitchedGraph.evaluate(contexts:) runs graphs through precompiled mx_evaluate_* kernels and a visible function table, so no runtime kernel source has to repeat the struct. README updated. Tests: ShadingContextTests (fields after texcoord do not shift it; signature order) plus the full suite on the new signature. Geometry nodes are #16; the second UV set is #17.
 
 ---
 

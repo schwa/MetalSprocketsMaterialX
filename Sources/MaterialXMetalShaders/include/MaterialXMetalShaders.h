@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MXShadingContext.h"
+
 #ifdef __OBJC__
 #import <Foundation/Foundation.h>
 NS_ASSUME_NONNULL_BEGIN

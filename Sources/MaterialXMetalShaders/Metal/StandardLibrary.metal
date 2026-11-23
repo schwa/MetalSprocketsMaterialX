@@ -1,5 +1,9 @@
 #include <metal_stdlib>
+#include "MXShadingContext.h"
 using namespace metal;
+
+// Stitched graphs have the signature `T graph(thread const MXShadingContext &context, constant float4 *parameters)`.
+typedef thread const MXShadingContext &MXContext;
 
 // Stitchable implementations of MaterialX stdlib nodes. Each function is named after its nodedef with `ND_` replaced
 // by `mx_`, and takes the nodedef's inputs in declaration order.
@@ -21,14 +25,33 @@ using namespace metal;
 
 // MARK: Output
 // Stitching drops graph arguments no node reads, which would change the function's signature. The output node takes
-// every argument so the signature stays `T (float2 texcoord, constant float4 *parameters)`.
+// every argument so the signature stays the same.
 
-[[stitchable]] float mx_output_float(float value, float2, constant float4 *) { return value; }
-[[stitchable]] float2 mx_output_vector2(float2 value, float2, constant float4 *) { return value; }
-[[stitchable]] float3 mx_output_vector3(float3 value, float2, constant float4 *) { return value; }
-[[stitchable]] float4 mx_output_vector4(float4 value, float2, constant float4 *) { return value; }
-[[stitchable]] int mx_output_integer(int value, float2, constant float4 *) { return value; }
-[[stitchable]] bool mx_output_boolean(bool value, float2, constant float4 *) { return value; }
+[[stitchable]] float mx_output_float(float value, MXContext, constant float4 *) { return value; }
+[[stitchable]] float2 mx_output_vector2(float2 value, MXContext, constant float4 *) { return value; }
+[[stitchable]] float3 mx_output_vector3(float3 value, MXContext, constant float4 *) { return value; }
+[[stitchable]] float4 mx_output_vector4(float4 value, MXContext, constant float4 *) { return value; }
+[[stitchable]] int mx_output_integer(int value, MXContext, constant float4 *) { return value; }
+[[stitchable]] bool mx_output_boolean(bool value, MXContext, constant float4 *) { return value; }
+
+// MARK: Evaluation
+// Kernels that call a stitched graph through a visible function table, one result per context. Used by
+// StitchedGraph.evaluate for tools and tests.
+
+#define MX_EVALUATE(SUFFIX, T, WIDEN) \
+    kernel void mx_evaluate_##SUFFIX(device const MXShadingContext *contexts [[buffer(0)]], constant float4 *parameters [[buffer(1)]], \
+                                     device float4 *out [[buffer(2)]], visible_function_table<T(MXContext, constant float4 *)> graph [[buffer(3)]], \
+                                     uint id [[thread_position_in_grid]]) { \
+        MXShadingContext context = contexts[id]; \
+        T value = graph[0](context, parameters); \
+        out[id] = WIDEN; \
+    }
+MX_EVALUATE(float, float, float4(value, 0, 0, 1))
+MX_EVALUATE(vector2, float2, float4(value, 0, 1))
+MX_EVALUATE(vector3, float3, float4(value, 1))
+MX_EVALUATE(vector4, float4, value)
+MX_EVALUATE(integer, int, float4(float(value), 0, 0, 1))
+MX_EVALUATE(boolean, bool, float4(value ? 1.0 : 0.0, 0, 0, 1))
 
 // MARK: Procedural
 
@@ -45,7 +68,8 @@ using namespace metal;
 
 // MARK: Geometry
 
-[[stitchable]] float2 mx_texcoord_vector2(float2 texcoord) { return texcoord; }
+// Geometric nodes take the shading context as their first argument, before the nodedef's inputs.
+[[stitchable]] float2 mx_texcoord_vector2(MXContext context, int index) { return context.texcoord[clamp(index, 0, 1)]; }
 
 // MARK: Math
 

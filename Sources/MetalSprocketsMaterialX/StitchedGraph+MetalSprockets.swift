@@ -1,5 +1,6 @@
 @_exported import MaterialX
 @_exported import MaterialXMetal
+@_exported import MaterialXMetalShaders
 import MetalSprockets
 
 public extension StitchedGraph {
