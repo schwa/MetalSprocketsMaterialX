@@ -100,3 +100,43 @@ struct NoiseTests {
         #expect(missing.isEmpty, "\(missing)")
     }
 }
+
+/// #70: random nodes are deterministic per input and seed and stay in range.
+@Suite(.serialized)
+struct RandomNodeTests {
+    func evaluate(_ node: String, type: String) throws -> SIMD4<Float> {
+        try #require(try NoiseTests().evaluate(node, type: type, at: [.zero]).first)
+    }
+
+    @Test func randomFloatIsDeterministicAndInRange() throws {
+        let node = { (input: String, seed: String) in
+            "<randomfloat name=\"n\" type=\"float\"><input name=\"in\" type=\"float\" value=\"\(input)\" /><input name=\"min\" type=\"float\" value=\"2\" /><input name=\"max\" type=\"float\" value=\"3\" /><input name=\"seed\" type=\"integer\" value=\"\(seed)\" /></randomfloat>"
+        }
+        let a = try evaluate(node("1.5", "7"), type: "float").x
+        #expect(try evaluate(node("1.5", "7"), type: "float").x == a)
+        #expect((2...3).contains(a))
+        let others = try ["2.5", "9.5", "-4.5"].map { try evaluate(node($0, "7"), type: "float").x }
+        #expect(others.contains { $0 != a })
+        #expect(try evaluate(node("1.5", "8"), type: "float").x != a)
+    }
+
+    @Test func randomColorStaysInItsHSVRanges() throws {
+        let value = try evaluate("""
+        <randomcolor name="n" type="color3">
+          <input name="in" type="float" value="3.5" />
+          <input name="saturationlow" type="float" value="0" /><input name="saturationhigh" type="float" value="0" />
+          <input name="brightnesslow" type="float" value="0.5" /><input name="brightnesshigh" type="float" value="0.5" />
+        </randomcolor>
+        """, type: "color3")
+        // Zero saturation at brightness 0.5 is gray 0.5 whatever the random hue.
+        #expect(simd_distance(SIMD3(value.x, value.y, value.z), [0.5, 0.5, 0.5]) < 1e-6, "\(value)")
+    }
+
+    @Test func everyRandomNodeDefIsSupported() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let coverage = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device)).coverage()
+        for name in ["ND_randomfloat_float", "ND_randomfloat_integer", "ND_randomcolor_float", "ND_randomcolor_integer", "ND_ceil_integer", "ND_floor_integer", "ND_round_integer"] {
+            #expect(coverage[name] != .unsupported, "\(name)")
+        }
+    }
+}

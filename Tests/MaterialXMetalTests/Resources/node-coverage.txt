@@ -57,6 +57,7 @@ ND_burn_float metal
 ND_ceil_color3 metal
 ND_ceil_color4 metal
 ND_ceil_float metal
+ND_ceil_integer metal
 ND_ceil_vector2 metal
 ND_ceil_vector3 metal
 ND_ceil_vector4 metal
@@ -206,6 +207,7 @@ ND_facingratio_float nodeGraph
 ND_floor_color3 metal
 ND_floor_color4 metal
 ND_floor_float metal
+ND_floor_integer metal
 ND_floor_vector2 metal
 ND_floor_vector3 metal
 ND_floor_vector4 metal
@@ -520,6 +522,8 @@ ND_ramptb_float metal
 ND_ramptb_vector2 metal
 ND_ramptb_vector3 metal
 ND_ramptb_vector4 metal
+ND_randomcolor_float nodeGraph
+ND_randomcolor_integer nodeGraph
 ND_randomfloat_float nodeGraph
 ND_randomfloat_integer nodeGraph
 ND_range_color3 nodeGraph
@@ -556,6 +560,7 @@ ND_roughness_anisotropy metal
 ND_round_color3 metal
 ND_round_color4 metal
 ND_round_float metal
+ND_round_integer metal
 ND_round_vector2 metal
 ND_round_vector3 metal
 ND_round_vector4 metal

@@ -1352,15 +1352,19 @@ ramplr, ramptb, ramp4, ramp, splitlr and splittb (all variants) do not stitch. A
 ## 70: Random nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:s, subtask, area:nodes
 depends: 67
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:45:05Z
+closed: 2026-11-23T14:45:05Z
 +++
 
 randomfloat and randomcolor have no implementation. Acceptance: both stitch, are deterministic for a seed, and match MaterialX's hashing. Part of #15.
+
+- `2026-11-23T14:45:05Z`: randomfloat and randomcolor (float and integer inputs) stitch through MaterialX's nodegraphs, which hash via cellnoise2d (#67); randomcolor needed the integer-output floor/ceil/round variants, now added. Tests: RandomNodeTests (deterministic per input and seed, in range; zero-saturation randomcolor is gray; all variants supported).
 
 ---
 

@@ -335,6 +335,10 @@ MX_UNARY(cos, cos(in))
 MX_UNARY(tan, tan(in))
 MX_UNARY(ln, log(in))
 MX_UNARY(asin, asin(in))
+// The integer-output variants (ND_floor_integer etc.), from MaterialX's int(floor(in)) and so on.
+[[stitchable]] int mx_floor_integer(float in) { return int(floor(in)); }
+[[stitchable]] int mx_ceil_integer(float in) { return int(ceil(in)); }
+[[stitchable]] int mx_round_integer(float in) { return int(round(in)); }
 MX_UNARY(acos, acos(in))
 
 // atan2 takes `iny` then `inx`, as the nodedef declares them.
