@@ -704,19 +704,20 @@ MaterialX surface shaders need light loops and IBL. MetalSprocketsLighting provi
 ## 38: Displacement and volume shaders are not supported
 
 +++
-status: open
+status: blocked
 priority: low
 kind: feature
 labels: effort:l, area:shading
 depends: 22, 33
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:35:07Z
+updated: 2026-11-23T14:19:47Z
 +++
 
 displacementshader, volumeshader and the displacement input on surfacematerial are ignored.
 
 - `2026-11-23T13:35:07Z`: Question 1 (decision): Defer displacement and volume shaders until #22 (normal/position in the shading context) and #33 (shader closures) exist, since displacement needs a vertex-stage hook and volumes need closures? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:19:47Z`: Per #38-Q1 this waits on #22 and #33. #22 is done; #33 (surface/volume shader closures, effort:xl, needs splitting) is not, so it stays blocked.
 
 ---
 
