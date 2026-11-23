@@ -939,15 +939,18 @@ There is no example that loads a .mtlx file and renders it on a mesh with MetalS
 ## 55: No CLI to inspect and stitch .mtlx files
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:s, area:tooling
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:32:06Z
+closed: 2026-11-23T13:32:06Z
 +++
 
 There is no command-line tool to list a document's materials and graphs, report unsupported nodes, or dump the stitched function and parameter layout.
+
+- `2026-11-23T13:32:06Z`: New 'mtlx' executable (swift-argument-parser): list (materials, shaders with connected inputs, nodegraphs), validate (exit 1 on issues), stitch [--graph] (each nodegraph output and connected shader input: type, parameter layout and values, optional stitching graph dump, or the reason it fails; exit 1 on failures), coverage [--unsupported]. Checked by hand on the corpus; no unit tests for the CLI glue, which only calls tested library APIs.
 
 ---
 
@@ -957,7 +960,7 @@ There is no command-line tool to list a document's materials and graphs, report 
 status: new
 priority: medium
 kind: feature
-labels: area:tooling,area:integration
+labels: area:tooling, area:integration
 created: 2026-11-23T13:31:07Z
 +++
 

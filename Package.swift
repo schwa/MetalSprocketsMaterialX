@@ -16,10 +16,12 @@ let package = Package(
         .library(name: "MaterialXMetal", targets: ["MaterialXMetal"]),
         // MetalSprockets integration.
         .library(name: "MetalSprocketsMaterialX", targets: ["MetalSprocketsMaterialX"]),
+        .executable(name: "mtlx", targets: ["mtlx"]),
     ],
     dependencies: [
         .package(url: "https://github.com/schwa/MetalSprockets", .upToNextMinor(from: "0.3.10")),
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", .upToNextMinor(from: "0.4.1")),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
     ],
     targets: [
         .target(
@@ -43,6 +45,15 @@ let package = Package(
                 "MaterialX",
                 "MaterialXMetal",
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
+            ]
+        ),
+        // Inspect, validate and stitch .mtlx files.
+        .executableTarget(
+            name: "mtlx",
+            dependencies: [
+                "MaterialX",
+                "MaterialXMetal",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .testTarget(name: "MaterialXTests", dependencies: ["MaterialX"]),
