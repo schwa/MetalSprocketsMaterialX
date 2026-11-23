@@ -54,6 +54,8 @@ public struct NodeDef: Hashable, Sendable {
     /// The node category this defines, such as `add`.
     public var node: String
     public var nodeGroup: String?
+    /// The nodedef this one inherits inputs and outputs from.
+    public var inherit: String?
     public var inputs: [Input]
     public var outputs: [Output]
 
@@ -64,11 +66,27 @@ public struct NodeDef: Hashable, Sendable {
         self.name = name
         self.node = node
         nodeGroup = element["nodegroup"]
+        inherit = element["inherit"]
         inputs = try element.children(tag: "input").map(Input.init)
         outputs = try element.children(tag: "output").map(Output.init)
     }
 
     public func input(_ name: String) -> Input? { inputs.first { $0.name == name } }
+
+    /// This nodedef with `parent`'s inputs and outputs merged in. Own entries override the parent's and keep the
+    /// parent's order.
+    func inheriting(from parent: Self) -> Self {
+        var result = self
+        result.inputs = Self.merge(parent.inputs, inputs, name: \.name)
+        result.outputs = Self.merge(parent.outputs, outputs, name: \.name)
+        return result
+    }
+
+    private static func merge<T>(_ parent: [T], _ own: [T], name: KeyPath<T, String>) -> [T] {
+        var merged = parent.map { item in own.first { $0[keyPath: name] == item[keyPath: name] } ?? item }
+        merged += own.filter { item in !parent.contains { $0[keyPath: name] == item[keyPath: name] } }
+        return merged
+    }
 }
 
 /// A node instance. Its tag is the node category.

@@ -49,9 +49,17 @@ public struct StandardLibrary: Sendable {
         for (nodeDef, graphName) in implementations {
             nodeGraphs[nodeDef] = nodeGraphs[nodeDef] ?? graphsByName[graphName]
         }
-        self.nodeDefs = nodeDefs
+        self.nodeDefs = nodeDefs.mapValues { Self.resolveInheritance($0, in: nodeDefs) }
         self.nodeGraphs = nodeGraphs
-        nodeDefsByCategory = Dictionary(grouping: nodeDefs.values, by: \.node)
+        nodeDefsByCategory = Dictionary(grouping: self.nodeDefs.values, by: \.node)
+    }
+
+    static func resolveInheritance(_ nodeDef: NodeDef, in nodeDefs: [String: NodeDef], visited: Set<String> = []) -> NodeDef {
+        guard let parentName = nodeDef.inherit, !visited.contains(parentName), let parent = nodeDefs[parentName] else {
+            return nodeDef
+        }
+        let resolvedParent = resolveInheritance(parent, in: nodeDefs, visited: visited.union([nodeDef.name]))
+        return nodeDef.inheriting(from: resolvedParent)
     }
 
     /// The nodedef for `node`: its explicit `nodedef`, else the one whose output type and input types match.

@@ -22,15 +22,18 @@ Documents that split definitions across files with <xi:include href=...> load on
 ## 2: Nodedef inheritance (inherit attribute) is not resolved
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:s, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T12:57:13Z
+closed: 2026-11-23T12:57:13Z
 +++
 
 Nodedefs such as ND_standard_surface_surfaceshader declare inherit="ND_standard_surface_surfaceshader_100". The inherited inputs and outputs are not merged, so a node matched to the child nodedef only sees the child's own inputs.
+
+- `2026-11-23T12:57:13Z`: StandardLibrary merges inherited inputs/outputs (own entries override, parent order kept). Test: nodeDefInheritance.
 
 ---
 

@@ -13,6 +13,15 @@ struct DocumentTests {
         #expect(library.nodeGraphs["ND_standard_surface_surfaceshader"] != nil)
     }
 
+    /// #2: a nodedef with `inherit` gets the parent's inputs and outputs; its own inputs override the parent's.
+    @Test func nodeDefInheritance() throws {
+        let nodeDef = try #require(StandardLibrary.shared.nodeDefs["ND_standard_surface_surfaceshader"])
+        #expect(nodeDef.input("specular_roughness") != nil)
+        #expect(nodeDef.input("base")?.value == .numbers([1]))
+        #expect(nodeDef.outputs.map(\.name) == ["out"])
+        #expect(nodeDef.inputs.filter { $0.name == "base" }.count == 1)
+    }
+
     @Test func nodeDefMatchesFloatArgumentVariant() throws {
         let node = try Node(Element(tag: "multiply", attributes: ["name": "m", "type": "color3"], children: [
             Element(tag: "input", attributes: ["name": "in1", "type": "color3", "value": "1, 1, 1"]),
