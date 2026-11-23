@@ -1,4 +1,5 @@
 import MaterialX
+import MaterialXMetalShaders
 import Metal
 import Synchronization
 
@@ -12,7 +13,7 @@ public final class MetalNodeLibrary: @unchecked Sendable {
 
     public init(device: MTLDevice) throws {
         self.device = device
-        library = try device.makeDefaultLibrary(bundle: .module)
+        library = try device.makeDefaultLibrary(bundle: .materialXMetalShaders())
         functionNames = Set(library.functionNames)
     }
 

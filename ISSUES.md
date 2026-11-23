@@ -516,15 +516,18 @@ Subgraphs that depend only on constants are stitched as function calls and evalu
 ## 31: Node library is compiled by SwiftPM's default .metal processing
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:s, area:build, area:shaders
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:16:12Z
+closed: 2026-11-23T13:16:12Z
 +++
 
 StandardLibrary.metal is a .process resource compiled into the target bundle's default.metallib. Other packages in this family use MetalCompilerPlugin with a bundle finder, debug metallibs and shared headers. Whether the default path works under Xcode builds, visionOS and iOS is untested.
+
+- `2026-11-23T13:16:12Z`: Node library moved to a MaterialXMetalShaders target compiled by MetalCompilerPlugin (debug metallibs with source in Debug), with a bundle finder (NSBundle.materialXMetalShadersBundle) and public include/ folder for shared headers, matching the sibling packages. iOS/visionOS builds are #52.
 
 ---
 

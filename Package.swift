@@ -19,6 +19,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/schwa/MetalSprockets", .upToNextMinor(from: "0.3.10")),
+        .package(url: "https://github.com/schwa/MetalCompilerPlugin", .upToNextMinor(from: "0.4.1")),
     ],
     targets: [
         .target(
@@ -27,8 +28,14 @@ let package = Package(
         ),
         .target(
             name: "MaterialXMetal",
-            dependencies: ["MaterialX"],
-            resources: [.process("Shaders")]
+            dependencies: ["MaterialX", "MaterialXMetalShaders"]
+        ),
+        // The [[stitchable]] node library, compiled by MetalCompilerPlugin like the other MetalSprockets packages.
+        .target(
+            name: "MaterialXMetalShaders",
+            exclude: ["Metal"],
+            cSettings: [.define("METAL_COMPILER_PLUGIN_DEBUG", .when(configuration: .debug))],
+            plugins: [.plugin(name: "MetalCompilerPlugin", package: "MetalCompilerPlugin")]
         ),
         .target(
             name: "MetalSprocketsMaterialX",
