@@ -240,6 +240,14 @@ MX_UNARY(sin, sin(in))
 MX_UNARY(cos, cos(in))
 MX_UNARY(tan, tan(in))
 MX_UNARY(ln, log(in))
+MX_UNARY(asin, asin(in))
+MX_UNARY(acos, acos(in))
+
+// atan2 takes `iny` then `inx`, as the nodedef declares them.
+[[stitchable]] float mx_atan2_float(float iny, float inx) { return atan2(iny, inx); }
+[[stitchable]] float2 mx_atan2_vector2(float2 iny, float2 inx) { return atan2(iny, inx); }
+[[stitchable]] float3 mx_atan2_vector3(float3 iny, float3 inx) { return atan2(iny, inx); }
+[[stitchable]] float4 mx_atan2_vector4(float4 iny, float4 inx) { return atan2(iny, inx); }
 MX_UNARY(exp, exp(in))
 MX_UNARY(dot, in)
 [[stitchable]] int mx_dot_integer(int in) { return in; }

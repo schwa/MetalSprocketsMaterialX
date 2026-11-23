@@ -1229,14 +1229,18 @@ The tangent-space normal input of realitykit_pbr_surfaceshader is not mapped eit
 ## 63: Inverse trigonometry nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:s, subtask, area:nodes
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:35:01Z
+closed: 2026-11-23T14:35:01Z
 +++
 
 asin, acos and atan2 (all float and vector variants) have no Metal implementation. Acceptance: every ND_asin_*, ND_acos_*, ND_atan2_* stitches and matches MaterialX's reference expressions (ReferenceImplementationTests). Part of #11.
+
+- `2026-11-23T14:35:01Z`: asin, acos (float, vector2–4) and atan2 (iny, inx) added. Covered by inverseTrigNodeDefsHaveMetalFunctions (failed before) and ReferenceImplementationTests, which now compares all 12 against MaterialX's GLSL expressions.
 
 ---
 

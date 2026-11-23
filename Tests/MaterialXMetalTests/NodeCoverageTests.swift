@@ -62,3 +62,16 @@ struct CoverageAgreesWithStitchingTests {
         #expect(disagreements.isEmpty, "\(disagreements.sorted())")
     }
 }
+
+/// #63: inverse trigonometry.
+struct InverseTrigonometryTests {
+    @Test func inverseTrigNodeDefsHaveMetalFunctions() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let coverage = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device)).coverage()
+        for category in ["asin", "acos", "atan2"] {
+            for type in ["float", "vector2", "vector3", "vector4"] {
+                #expect(coverage["ND_\(category)_\(type)"] == .metal, "ND_\(category)_\(type)")
+            }
+        }
+    }
+}
