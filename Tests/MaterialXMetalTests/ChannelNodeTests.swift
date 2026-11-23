@@ -1108,3 +1108,37 @@ struct UnlitAndNPRTests {
         #expect(value.x.isFinite && value.y.isFinite && value.z.isFinite)
     }
 }
+
+/// #69: ramps and splits.
+@Suite(.serialized)
+struct RampAndSplitTests {
+    func evaluate(_ node: String, type: String = "float", at texcoords: [SIMD2<Float>]) throws -> [Float] {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(node)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "ramp_test")
+        return try graph.evaluate(at: texcoords).map(\.x)
+    }
+
+    @Test func rampsInterpolateAcrossUV() throws {
+        let lr = try evaluate("<ramplr name=\"n\" type=\"float\"><input name=\"valuel\" type=\"float\" value=\"2\" /><input name=\"valuer\" type=\"float\" value=\"6\" /></ramplr>", at: [[0, 0], [0.25, 0], [1.5, 0]])
+        #expect(lr == [2, 3, 6])
+        let tb = try evaluate("<ramptb name=\"n\" type=\"float\"><input name=\"valuet\" type=\"float\" value=\"2\" /><input name=\"valueb\" type=\"float\" value=\"6\" /></ramptb>", at: [[0, 0], [0, 0.5]])
+        #expect(tb == [2, 4])
+    }
+
+    @Test func splitsSwitchAtTheCenter() throws {
+        let lr = try evaluate("<splitlr name=\"n\" type=\"float\"><input name=\"valuel\" type=\"float\" value=\"1\" /><input name=\"valuer\" type=\"float\" value=\"5\" /><input name=\"center\" type=\"float\" value=\"0.3\" /></splitlr>", at: [[0.2, 0], [0.4, 0]])
+        #expect(lr == [1, 5])
+        let tb = try evaluate("<splittb name=\"n\" type=\"float\"><input name=\"valuet\" type=\"float\" value=\"1\" /><input name=\"valueb\" type=\"float\" value=\"5\" /></splittb>", at: [[0, 0.4], [0, 0.6]])
+        #expect(tb == [1, 5])
+    }
+
+    @Test func everyRampAndSplitNodeDefStitches() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let coverage = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device)).coverage()
+        let names = StandardLibrary.shared.nodeDefs.keys.filter { ["ND_ramplr_", "ND_ramptb_", "ND_splitlr_", "ND_splittb_", "ND_ramp4_", "ND_ramp_"].contains(where: $0.hasPrefix) } + ["ND_ramp"]
+        let missing = names.filter { coverage[$0] == .unsupported }.sorted()
+        #expect(missing.isEmpty, "\(missing)")
+    }
+}

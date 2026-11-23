@@ -1318,14 +1318,18 @@ worleynoise2d/3d and unifiednoise2d/3d have no implementation. Acceptance: all v
 ## 69: Ramp and split nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:s, subtask, area:nodes
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:36:05Z
+closed: 2026-11-23T14:36:05Z
 +++
 
 ramplr, ramptb, ramp4, ramp, splitlr and splittb (all variants) do not stitch. Acceptance: all variants report supported in coverage() and produce the expected values at UV corners/edges. Part of #15.
+
+- `2026-11-23T14:36:05Z`: ramplr, ramptb, splitlr, splittb (float, vector2–4, color3/4) ported from MaterialX's GLSL; ramp4, ramp and ramp_gradient now stitch through their nodegraphs. Difference: MaterialX antialiases splits with screen-space derivatives (mx_aastep), which stitched visible functions cannot use, so splits switch with a hard step. Tests: RampAndSplitTests (failed before).
 
 ---
 

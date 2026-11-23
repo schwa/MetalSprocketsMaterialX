@@ -485,6 +485,22 @@ MX_MASKED(outside, in * (1.0 - mask))
 [[stitchable]] float4 mx_premult_color4(float4 in) { return float4(in.rgb * in.a, in.a); }
 [[stitchable]] float4 mx_unpremult_color4(float4 in) { return float4(in.rgb / in.a, in.a); }
 
+// MARK: Ramps and splits (from MaterialX's mx_ramplr/ramptb/splitlr/splittb GLSL)
+// MaterialX's splits antialias with screen-space derivatives (mx_aastep), which stitched visible functions cannot
+// use; these switch with a hard step.
+
+#define MX_RAMP_SPLIT(SUFFIX, T) \
+    [[stitchable]] T mx_ramplr_##SUFFIX(T valuel, T valuer, float2 texcoord) { return mix(valuel, valuer, clamp(texcoord.x, 0.0, 1.0)); } \
+    [[stitchable]] T mx_ramptb_##SUFFIX(T valuet, T valueb, float2 texcoord) { return mix(valuet, valueb, clamp(texcoord.y, 0.0, 1.0)); } \
+    [[stitchable]] T mx_splitlr_##SUFFIX(T valuel, T valuer, float center, float2 texcoord) { return mix(valuel, valuer, step(center, texcoord.x)); } \
+    [[stitchable]] T mx_splittb_##SUFFIX(T valuet, T valueb, float center, float2 texcoord) { return mix(valuet, valueb, step(center, texcoord.y)); }
+MX_RAMP_SPLIT(float, float)
+MX_RAMP_SPLIT(vector2, float2)
+MX_RAMP_SPLIT(vector3, float3)
+MX_RAMP_SPLIT(vector4, float4)
+MX_RAMP_SPLIT(color3, float3)
+MX_RAMP_SPLIT(color4, float4)
+
 // MARK: Conditional
 // Suffix-free nodedefs compare floats, `I` integers, `B` booleans. switch and logical_xor are functional nodegraphs
 // built from these.
