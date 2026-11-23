@@ -245,11 +245,14 @@ status: open
 priority: high
 kind: feature
 labels: effort:m, area:nodes, area:geometry
+depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T12:59:10Z
 +++
 
 position, normal, tangent, bitangent, geomcolor, geompropvalue, time, frame, viewdirection and the space input (model/object/world) are not available. The stitched function only receives a texture coordinate.
+
+- `2026-11-23T12:59:10Z`: Question 1 (decision): Implement position/normal/tangent/bitangent/geomcolor/time/frame/viewdirection as readers of the MXShadingContext proposed in #22-Q1 once that is answered, with the space input (model/object/world) choosing between the struct's object and world fields? Recommended: Yes
 
 ---
 
