@@ -176,6 +176,7 @@ ND_extract_color4 metal
 ND_extract_vector2 metal
 ND_extract_vector3 metal
 ND_extract_vector4 metal
+ND_facingratio_float nodeGraph
 ND_floor_color3 metal
 ND_floor_color4 metal
 ND_floor_float metal
@@ -206,6 +207,7 @@ ND_geompropvalue_integer metal
 ND_geompropvalue_vector2 metal
 ND_geompropvalue_vector3 metal
 ND_geompropvalue_vector4 metal
+ND_glossiness_anisotropy nodeGraph
 ND_gooch_shade nodeGraph
 ND_grid_color3 nodeGraph
 ND_hexagon_float nodeGraph
@@ -279,6 +281,17 @@ ND_in_color4 metal
 ND_inside_color3 metal
 ND_inside_color4 metal
 ND_inside_float metal
+ND_invert_color3 metal
+ND_invert_color3FA metal
+ND_invert_color4 metal
+ND_invert_color4FA metal
+ND_invert_float metal
+ND_invert_vector2 metal
+ND_invert_vector2FA metal
+ND_invert_vector3 metal
+ND_invert_vector3FA metal
+ND_invert_vector4 metal
+ND_invert_vector4FA metal
 ND_lin_adobergb_to_lin_rec709_color3 nodeGraph
 ND_lin_adobergb_to_lin_rec709_color4 nodeGraph
 ND_lin_displayp3_to_lin_rec709_color3 nodeGraph
@@ -361,6 +374,7 @@ ND_normal_vector3 metal
 ND_normalize_vector2 metal
 ND_normalize_vector3 metal
 ND_normalize_vector4 metal
+ND_open_pbr_anisotropy nodeGraph
 ND_open_pbr_surface_to_standard_surface nodeGraph
 ND_out_color4 metal
 ND_outside_color3 metal

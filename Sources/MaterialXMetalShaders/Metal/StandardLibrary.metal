@@ -186,6 +186,20 @@ MX_BINARY_ALL(subtract, in1 - in2)
 MX_BINARY_ALL(multiply, in1 * in2)
 MX_BINARY_ALL(divide, in1 / in2)
 MX_BINARY_ALL(modulo, in1 - in2 * floor(in1 / in2))
+
+#define MX_INVERT(SUFFIX, T, U) \
+    [[stitchable]] T mx_invert_##SUFFIX(T in, U amount) { return T(amount) - in; }
+MX_INVERT(float, float, float)
+MX_INVERT(vector2, float2, float2)
+MX_INVERT(vector3, float3, float3)
+MX_INVERT(vector4, float4, float4)
+MX_INVERT(color3, float3, float3)
+MX_INVERT(color4, float4, float4)
+MX_INVERT(vector2FA, float2, float)
+MX_INVERT(vector3FA, float3, float)
+MX_INVERT(vector4FA, float4, float)
+MX_INVERT(color3FA, float3, float)
+MX_INVERT(color4FA, float4, float)
 MX_BINARY_ALL(max, max(in1, decltype(in1)(in2)))
 MX_BINARY_ALL(min, min(in1, decltype(in1)(in2)))
 

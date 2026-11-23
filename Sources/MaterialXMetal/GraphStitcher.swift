@@ -629,7 +629,8 @@ struct Builder {
         if let space = definition["space"] {
             arguments.append(try parameter(name: key + ".space", type: .integer, value: .integer(Self.spaceCode(.string(space)))))
         }
-        if category != "position", category != "normal" {
+        // Only these geometry functions take an index after the space (see StandardLibrary.metal).
+        if ["texcoord", "tangent", "bitangent", "geomcolor"].contains(category) {
             arguments.append(try parameter(name: key + ".index", type: .integer, value: .integer(Int(definition["index"] ?? "0") ?? 0)))
         }
         let call = try call("mx_\(category)_\(type)", arguments)

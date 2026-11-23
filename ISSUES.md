@@ -723,19 +723,21 @@ displacementshader, volumeshader and the displacement input on surfacematerial a
 ## 39: Unlit and NPR shaders are not supported
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:m, area:shading
-depends: 22, 33
+depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:33:55Z
+updated: 2026-11-23T14:19:38Z
+closed: 2026-11-23T14:19:38Z
 +++
 
 surface_unlit, nprlib nodes (facingratio, viewdirection-based nodes) and gltf_unlit-style materials have no implementation.
 
 - `2026-11-23T13:33:55Z`: Question 1 (decision): Wait for #22 (shading context with view direction/normal) and #33 (surfaceshader representation) before implementing surface_unlit and nprlib, since both need values the stitched signature does not carry yet? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:19:38Z`: #22 landed (shading context with view direction and normal), so this no longer waits on #33: surface_unlit is compiled by GraphStitcher.stitchUnlit/planUnlit into a color4 graph (rgb = emission × emission_color, a = opacity) that MaterialXUnlitSurface draws; transmission is not drawn. nprlib nodes: viewdirection (#16), facingratio and gooch_shade now stitch through their nodegraphs after adding invert (all variants) and fixing defaultgeomprop geometry calls (viewdirection/position/normal take no index). Tests: UnlitAndNPRTests (unlit color and opacity; facing ratio 1 head-on and 0 at grazing; gooch stitches).
 
 ---
 

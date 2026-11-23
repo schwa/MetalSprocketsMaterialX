@@ -156,6 +156,40 @@ public extension GraphStitcher {
         return GraphPlan(functionName: functionName, outputType: .surfaceshader, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)
     }
 
+    /// An unlit surface shader as a color4 graph for ``MaterialXUnlitSurface``: rgb = emission × emission color,
+    /// a = opacity. Supports `surface_unlit`; `transmission` is not drawn.
+    func planUnlit(_ shader: MaterialXNode, in document: MaterialXDocument, functionName: String) throws -> GraphPlan {
+        guard shader.category == "surface_unlit" else {
+            throw MaterialXError.unsupportedNode("unlit surface <\(shader.category)>")
+        }
+        guard let nodeDef = standardLibrary.nodeDef(for: shader) else {
+            throw MaterialXError.missingNodeDef(node: "\(shader.name) (\(shader.category))")
+        }
+        var builder = Builder(stitcher: self)
+        builder.documentGraphs = Dictionary(document.nodeGraphs.map { ($0.name, $0) }) { first, _ in first }
+        builder.documentColorSpace = document.colorSpace
+        builder.documentFilePrefix = document.root["fileprefix"]
+        let graph = try Self.documentLevelGraph(document, output: shader.name, type: .surfaceshader)
+        let scope = Builder.Scope(graph: graph, prefix: "", bindings: [:], colorSpace: document.colorSpace, strings: [:], filePrefix: document.root["fileprefix"])
+        func input(_ name: String) throws -> GraphPlan.Operand {
+            guard let definition = nodeDef.input(name) else {
+                throw MaterialXError.invalidDocument("\(nodeDef.name) has no input '\(name)'")
+            }
+            return try builder.resolve(input: shader.input(name), definition: definition, owner: shader.name, nodeColorSpace: shader.element["colorspace"] ?? document.colorSpace, in: scope)
+        }
+        let emission = try input("emission")
+        let emissionColor = try input("emission_color")
+        let opacity = try input("opacity")
+        let color = try builder.call("mx_multiply_color3FA", [emissionColor, emission])
+        let rgba = try builder.call("mx_combine2_color4CF", [color, opacity])
+        _ = try builder.call("mx_output_vector4", [rgba, .context, .parameters, .textures])
+        return GraphPlan(functionName: functionName, outputType: .color4, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)
+    }
+
+    func stitchUnlit(_ shader: MaterialXNode, in document: MaterialXDocument, functionName: String) throws -> StitchedGraph {
+        try stitch(planUnlit(shader, in: document, functionName: functionName))
+    }
+
     func stitchSurface(_ shader: MaterialXNode, in document: MaterialXDocument, functionName: String, mapping: SurfaceMapping? = nil) throws -> StitchedGraph {
         try stitch(planSurface(shader, in: document, functionName: functionName, mapping: mapping))
     }

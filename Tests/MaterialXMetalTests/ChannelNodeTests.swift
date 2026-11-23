@@ -1051,3 +1051,60 @@ struct RealityKitNodeTests {
         #expect(abs(surface.roughness - 0.5) < 1e-6) // RealityKit's default
     }
 }
+
+/// #39: surface_unlit draws through MaterialXUnlitSurface; the NPR nodes stitch.
+@Suite(.serialized)
+struct UnlitAndNPRTests {
+    @Test func surfaceUnlitBecomesAColor4Graph() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39">
+          <constant name="tint" type="color3"><input name="value" type="color3" value="0.5, 0.25, 1" /></constant>
+          <surface_unlit name="u" type="surfaceshader">
+            <input name="emission" type="float" value="0.5" />
+            <input name="emission_color" type="color3" nodename="tint" />
+            <input name="opacity" type="float" value="0.75" />
+          </surface_unlit>
+        </materialx>
+        """
+        let document = try MaterialXDocument(data: Data(xml.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try stitcher.stitchUnlit(try #require(document.nodes.first { $0.name == "u" }), in: document, functionName: "unlit")
+        #expect(graph.outputType == .color4)
+        #expect(try graph.evaluate(at: [.zero]).first == [0.25, 0.125, 0.5, 0.75])
+    }
+
+    @Test func facingRatioFollowsTheView() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <facingratio name="n" type="float" />
+          <output name="out" type="float" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "facing")
+        var headOn = MXShadingContext(texcoord: .zero)
+        headOn.normalWorld = [0, 1, 0]
+        headOn.viewDirectionWorld = [0, 1, 0]
+        var grazing = headOn
+        grazing.viewDirectionWorld = [1, 0, 0]
+        let values = try graph.evaluate(contexts: [headOn, grazing]).map(\.x)
+        #expect(abs(values[0] - 1) < 1e-6)
+        #expect(abs(values[1]) < 1e-6)
+    }
+
+    @Test func goochShadeStitches() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <gooch_shade name="n" type="color3" />
+          <output name="out" type="color3" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "gooch")
+        let value = try #require(try graph.evaluate(at: [.zero]).first)
+        #expect(value.x.isFinite && value.y.isFinite && value.z.isFinite)
+    }
+}
