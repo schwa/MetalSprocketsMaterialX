@@ -872,6 +872,9 @@ updated: 2026-11-23T12:55:47Z
 
 Package.swift declares iOS 26 and visionOS 26 but only macOS tests have run.
 
+- `2026-11-23T13:18:15Z`: xcb builds Swift packages with 'swift build' even with -d ios / -d visionos (xcb build --dry-run --scheme MetalSprocketsMaterialX-Package -d visionos prints 'swift build'; same in MetalSprocketsParticles), so its 'Build succeeded' for those destinations is a macOS build and does not verify iOS/visionOS.
+- `2026-11-23T13:18:15Z`: Question 1 (decision): May I run xcodebuild directly (-scheme MetalSprocketsMaterialX-Package -destination generic/platform=iOS and visionOS) for this check, since xcb only runs swift build for packages? Recommended: Yes, for this one-off verification
+
 ---
 
 ## 53: No README usage docs or DocC
