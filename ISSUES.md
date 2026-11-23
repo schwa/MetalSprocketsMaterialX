@@ -321,6 +321,7 @@ updated: 2026-11-23T12:56:14Z
 image, tiledimage, triplanarprojection, hextiledimage, gltf_image/gltf_colorimage/gltf_normalmap and their uaddressmode, vaddressmode, filtertype, framerange, frameoffset, frameendaction, default and texcoord inputs have no implementation. Stitched functions have no way to reach textures or samplers today.
 
 - `2026-11-23T12:56:14Z`: Question 1 (decision): Implement image nodes only after #22 (shading context) and #23 (texture passing) are designed, with textures reaching stitched functions through an argument buffer of texture2d+sampler pairs indexed by a parameter slot? Recommended: Yes
+- `2026-11-23T13:40:41Z`: Answer 1: YES
 
 ---
 
@@ -393,6 +394,7 @@ The stitched function is T(float2 texcoord, constant float4 *parameters). There 
 
 - `2026-11-23T12:56:14Z`: Question 1 (design): Should the stitched function become T graph(thread const MXShadingContext &context, constant float4 *parameters), with MXShadingContext (world/object position and normal, tangent, bitangent, view direction, texcoord[2], vertex color, time, frame) in a shared header? Recommended: Yes
 - `2026-11-23T13:38:12Z`: Related: #61 (evaluation kernels hard-code the current signature).
+- `2026-11-23T13:40:51Z`: Answer 1: YES
 
 ---
 
