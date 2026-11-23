@@ -150,6 +150,7 @@ public struct Document: Sendable {
     public var root: Element
     public var version: String?
     public var colorSpace: String?
+    public var typeDefs: [TypeDef]
     public var nodeDefs: [NodeDef]
     public var nodeGraphs: [NodeGraph]
     /// Top-level nodes (shaders, materials, loose nodes).
@@ -198,6 +199,7 @@ public struct Document: Sendable {
         self.root = root
         version = root["version"]
         colorSpace = root["colorspace"]
+        typeDefs = try root.children(tag: "typedef").map(TypeDef.init)
         nodeDefs = try root.children(tag: "nodedef").map(NodeDef.init)
         nodeGraphs = try root.children(tag: "nodegraph").map(NodeGraph.init)
         let skipped: Set<String> = ["nodedef", "nodegraph", "implementation", "typedef", "unitdef", "unittypedef", "look", "collection", "geominfo", "propertyset", "variantset", "xi:include", "backdrop", "comment", "token"]

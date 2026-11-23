@@ -61,15 +61,18 @@ MaterialX nodedefs have version and isdefaultversion attributes, and nodes can r
 ## 4: Type defaults and typedefs are not modelled
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:m, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:07:35Z
+closed: 2026-11-23T13:07:35Z
 +++
 
 ValueType is a string wrapper. Custom <typedef> elements, struct types (1.39), multi-output types and the semantic and context attributes are not read. Integer and boolean inputs parse as floats.
+
+- `2026-11-23T13:07:35Z`: Value has integer and boolean cases (strict parsing; .numbers still bridges them to floats). TypeDef (semantic, context, struct members) read into Document.typeDefs and StandardLibrary.typeDefs. Struct-typed ports are not stitched. Tests: parsesValues, typeDefsAreRead.
 
 ---
 

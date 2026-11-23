@@ -40,18 +40,34 @@ public struct ValueType: RawRepresentable, Hashable, Sendable, CustomStringConve
     public var description: String { rawValue }
 }
 
-/// A parsed MaterialX value. Numeric values are stored as floats.
+/// A parsed MaterialX value. Float vectors, colors and matrices are stored as floats.
 public enum Value: Hashable, Sendable {
     case numbers([Float])
+    case integer(Int)
+    case boolean(Bool)
+    /// Strings, filenames, arrays and other non-numeric types, unparsed.
     case string(String)
 
     public init(_ string: String, type: ValueType) throws {
+        let trimmed = string.trimmingCharacters(in: .whitespaces)
+        switch type {
+        case .integer:
+            guard let value = Int(trimmed) else {
+                throw MaterialXError.invalidValue("'\(string)' as \(type)")
+            }
+            self = .integer(value)
+            return
+        case .boolean:
+            guard trimmed == "true" || trimmed == "false" else {
+                throw MaterialXError.invalidValue("'\(string)' as \(type)")
+            }
+            self = .boolean(trimmed == "true")
+            return
+        default:
+            break
+        }
         if type.componentCount == nil {
             self = .string(string)
-            return
-        }
-        if type == .boolean {
-            self = .numbers([string.trimmingCharacters(in: .whitespaces) == "true" ? 1 : 0])
             return
         }
         let parts = string.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -62,7 +78,44 @@ public enum Value: Hashable, Sendable {
         self = .numbers(numbers)
     }
 
+    /// The value as floats; integers and booleans become one float.
     public var numbers: [Float]? {
-        if case let .numbers(values) = self { values } else { nil }
+        switch self {
+        case let .numbers(values): values
+        case let .integer(value): [Float(value)]
+        case let .boolean(value): [value ? 1 : 0]
+        case .string: nil
+        }
+    }
+}
+
+/// A `<typedef>`: a data type's semantic and context, and its members for struct types.
+public struct TypeDef: Hashable, Sendable {
+    public struct Member: Hashable, Sendable {
+        public var name: String
+        public var type: ValueType
+        public var value: String?
+    }
+
+    public var name: ValueType
+    /// For example `color` or `shader`.
+    public var semantic: String?
+    /// For shader types, for example `surface`.
+    public var context: String?
+    public var members: [Member]
+
+    public init(_ element: Element) throws {
+        guard let name = element.name else {
+            throw MaterialXError.invalidDocument("<typedef> without name")
+        }
+        self.name = ValueType(rawValue: name)
+        semantic = element["semantic"]
+        context = element["context"]
+        members = try element.children(tag: "member").map { member in
+            guard let name = member.name, let type = member["type"] else {
+                throw MaterialXError.invalidDocument("<member> without name or type in typedef '\(name)'")
+            }
+            return Member(name: name, type: ValueType(rawValue: type), value: member["value"])
+        }
     }
 }

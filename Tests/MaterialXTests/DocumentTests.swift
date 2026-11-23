@@ -63,8 +63,27 @@ struct DocumentTests {
 
     @Test func parsesValues() throws {
         #expect(try Value("0.1, 0.2, 0.3", type: .color3) == .numbers([0.1, 0.2, 0.3]))
-        #expect(try Value("true", type: .boolean) == .numbers([1]))
+        #expect(try Value("true", type: .boolean) == .boolean(true))
+        #expect(try Value("true", type: .boolean).numbers == [1])
+        #expect(try Value(" 3 ", type: .integer) == .integer(3))
         #expect(throws: MaterialXError.self) { try Value("1, 2", type: .color3) }
+        #expect(throws: MaterialXError.self) { try Value("1.5", type: .integer) }
+        #expect(throws: MaterialXError.self) { try Value("yes", type: .boolean) }
+    }
+
+    /// #4: typedefs, including struct members, are read.
+    @Test func typeDefsAreRead() throws {
+        let library = StandardLibrary.shared
+        #expect(library.typeDefs[.color3]?.semantic == "color")
+        #expect(library.typeDefs[.surfaceshader]?.context == "surface")
+        let source = """
+        <materialx version="1.39">
+          <typedef name="texcoord_struct"><member name="uv" type="vector2" value="0, 0" /><member name="set" type="integer" /></typedef>
+        </materialx>
+        """
+        let typeDef = try #require(try Document(data: Data(source.utf8)).typeDefs.first)
+        #expect(typeDef.members.map(\.name) == ["uv", "set"])
+        #expect(typeDef.members.map(\.type) == [.vector2, .integer])
     }
 
     /// Every .mtlx file shipped with the system or Reality Composer Pro parses. Skipped when none are installed.

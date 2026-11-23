@@ -3,6 +3,7 @@ import Foundation
 /// The MaterialX data libraries (stdlib, pbrlib, bxdf, …) bundled with this package. Version 1.39.4.
 public struct StandardLibrary: Sendable {
     public var nodeDefs: [String: NodeDef]
+    public var typeDefs: [ValueType: TypeDef]
     /// Functional nodegraphs (`*_ng.mtlx`) keyed by the nodedef they implement.
     public var nodeGraphs: [String: NodeGraph]
     private var nodeDefsByCategory: [String: [NodeDef]]
@@ -39,10 +40,14 @@ public struct StandardLibrary: Sendable {
     public init(documents: [Document]) {
         self.documents = documents
         var nodeDefs: [String: NodeDef] = [:]
+        var typeDefs: [ValueType: TypeDef] = [:]
         var nodeGraphs: [String: NodeGraph] = [:]
         var graphsByName: [String: NodeGraph] = [:]
         var implementations: [(nodeDef: String, nodeGraph: String)] = []
         for document in documents {
+            for typeDef in document.typeDefs {
+                typeDefs[typeDef.name] = typeDef
+            }
             for nodeDef in document.nodeDefs {
                 nodeDefs[nodeDef.name] = nodeDef
             }
@@ -63,6 +68,7 @@ public struct StandardLibrary: Sendable {
         }
         self.nodeDefs = nodeDefs.mapValues { Self.resolveInheritance($0, in: nodeDefs) }
         self.nodeGraphs = nodeGraphs
+        self.typeDefs = typeDefs
         nodeDefsByCategory = Dictionary(grouping: self.nodeDefs.values, by: \.node)
     }
 
