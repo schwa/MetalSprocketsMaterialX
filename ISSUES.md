@@ -180,6 +180,8 @@ updated: 2026-11-23T12:55:47Z
 Types are named Element, Node, Input, Output, Value, Document in module MaterialX. They clash easily with other modules imported by SceneSprockets and MetalSprockets (e.g. Node in SceneSprockets). Naming, Sendable, Codable and mutability were picked quickly during bootstrap.
 
 - `2026-11-23T13:19:31Z`: Question 1 (design): Rename the MaterialX module's generic types with a MaterialX prefix (MaterialXDocument, MaterialXNode, MaterialXInput, MaterialXOutput, MaterialXValue, MaterialXElement; NodeDef/NodeGraph/TypeDef keep their names) so they do not clash with SceneSprockets' Node etc.? Recommended: Yes
+- `2026-11-23T13:39:37Z`: I'd rather not :-(
+- `2026-11-23T13:39:45Z`: Answer 1: I'd rather not :-(
 
 ---
 
@@ -282,6 +284,7 @@ updated: 2026-11-23T12:59:10Z
 position, normal, tangent, bitangent, geomcolor, geompropvalue, time, frame, viewdirection and the space input (model/object/world) are not available. The stitched function only receives a texture coordinate.
 
 - `2026-11-23T12:59:10Z`: Question 1 (decision): Implement position/normal/tangent/bitangent/geomcolor/time/frame/viewdirection as readers of the MXShadingContext proposed in #22-Q1 once that is answered, with the space input (model/object/world) choosing between the struct's object and world fields? Recommended: Yes
+- `2026-11-23T13:40:33Z`: Answer 1: YES
 
 ---
 
@@ -1009,12 +1012,13 @@ Related:
 ## 57: Node implementation rules are duplicated across stitching, coverage and validation
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: area:architecture, effort:m
 created: 2026-11-23T13:37:47Z
-updated: 2026-11-23T13:38:12Z
+updated: 2026-11-23T13:40:33Z
+closed: 2026-11-23T13:40:33Z
 +++
 
 Three places independently decide how a MaterialX node maps to an implementation:
@@ -1029,6 +1033,7 @@ Consequences seen so far:
 - coverage() reports a node as supported from a static walk that can disagree with what stitch() actually does (for example texcoord index != 0, colorspace inlining, value types without a parameter reader).
 
 - `2026-11-23T13:38:12Z`: Related: #58 (both concern Builder in GraphStitcher.swift; a shared resolution step would touch both).
+- `2026-11-23T13:40:33Z`: GraphStitcher.resolution(of:output:) is now the one place that decides function name, multi-output suffix, function vs functional nodegraph vs unsupported; stitch() and coverage() both use it. Validation keeps using StandardLibrary.nodeDef(for:) and interfaceInput(_:of:), which it already shared. New boundary test everyNodeDefStitchesExactlyWhenCoverageSaysSo stitches every single-output data nodedef and compares with coverage(); it failed before with 7 disagreements: ND_texcoord_vector3 (coverage claimed metal) and ND_blur_* (stitch resolved the unused string filtertype input and threw). Functional-graph inlining now binds only inputs with stitchable value types. Coverage baseline drops ND_texcoord_vector3.
 
 ---
 

@@ -38,3 +38,27 @@ struct NodeCoverageTests {
         #expect(coverage["ND_noise2d_float"] == .unsupported)
     }
 }
+
+/// #57: coverage() and stitch() must agree, because both use the same node resolution.
+@Suite(.serialized)
+struct CoverageAgreesWithStitchingTests {
+    @Test func everyNodeDefStitchesExactlyWhenCoverageSaysSo() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let coverage = stitcher.coverage()
+        var disagreements: [String] = []
+        for nodeDef in StandardLibrary.shared.nodeDefs.values {
+            // Only single-output data nodes can be stitched as a graph output.
+            guard nodeDef.outputs.count == 1, let type = nodeDef.outputs.first?.type,
+                  [ValueType.float, .vector2, .vector3, .vector4, .color3, .color4, .integer, .boolean].contains(type) else { continue }
+            let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\"><\(nodeDef.node) name=\"n\" type=\"\(type)\" nodedef=\"\(nodeDef.name)\" /><output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
+            let graph = try #require(try Document(data: Data(xml.utf8)).nodeGraph("g"))
+            let stitched = (try? stitcher.stitch(graph, functionName: "f")) != nil
+            let supported = coverage[nodeDef.name] != .unsupported
+            if stitched != supported {
+                disagreements.append("\(nodeDef.name): coverage \(coverage[nodeDef.name]?.rawValue ?? "nil"), stitched \(stitched)")
+            }
+        }
+        #expect(disagreements.isEmpty, "\(disagreements.sorted())")
+    }
+}

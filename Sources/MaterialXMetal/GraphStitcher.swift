@@ -221,7 +221,7 @@ private struct Builder {
     var functions: [String: MTLFunction] = [:]
     var functionNodes: [MTLFunctionStitchingFunctionNode] = []
     var resolved: [String: MTLFunctionStitchingNode] = [:]
-    var nodeArguments: [String: [MTLFunctionStitchingNode]] = [:]
+    var nodeArguments: [String: MTLFunctionStitchingNode] = [:]
     var visiting: Set<String> = []
     var parameters: [StitchedGraph.Parameter] = []
     var parameterData: [SIMD4<Float>] = []
@@ -314,41 +314,38 @@ private struct Builder {
         defer { visiting.remove(key) }
 
         let stitchingNode: MTLFunctionStitchingNode
-        if node.category == "texcoord" {
+        guard let nodeDef = stitcher.standardLibrary.nodeDef(for: node) else {
+            throw MaterialXError.missingNodeDef(node: "\(node.name) (\(node.category), \(node.type))")
+        }
+        // Inputs are resolved once per node, so every output of a multi-output node shares them.
+        func argument(_ definition: Input) throws -> MTLFunctionStitchingNode {
+            let argumentKey = nodeKey + "." + definition.name
+            if let cached = nodeArguments[argumentKey] {
+                return cached
+            }
+            let argument = try resolve(input: node.input(definition.name), definition: definition, owner: nodeKey, nodeColorSpace: node.element["colorspace"] ?? scope.colorSpace, in: scope)
+            nodeArguments[argumentKey] = argument
+            return argument
+        }
+        switch stitcher.resolution(of: nodeDef, output: outputName) {
+        case let .function(functionName) where node.category == "texcoord":
             // Only one UV set reaches the stitched function until the shading context grows (#22).
             if let index = node.input("index")?.value?.numbers?.first, index != 0 {
                 throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'")
             }
-            stitchingNode = try call("mx_texcoord_vector2", [texcoord])
-        } else {
-            guard let nodeDef = stitcher.standardLibrary.nodeDef(for: node) else {
-                throw MaterialXError.missingNodeDef(node: "\(node.name) (\(node.category), \(node.type))")
+            stitchingNode = try call(functionName, [texcoord])
+        case let .function(functionName):
+            stitchingNode = try call(functionName, nodeDef.inputs.map(argument))
+        case let .nodeGraph(implementation):
+            // Inputs with no stitchable value type (filenames, strings) are left unbound; the graph only fails if it
+            // reads one.
+            var bindings: [String: MTLFunctionStitchingNode] = [:]
+            for definition in nodeDef.inputs where definition.type.isStitchable {
+                bindings[definition.name] = try argument(definition)
             }
-            // Inputs are resolved once per node, so every output of a multi-output node shares them.
-            let arguments: [MTLFunctionStitchingNode]
-            if let cached = nodeArguments[nodeKey] {
-                arguments = cached
-            } else {
-                arguments = try nodeDef.inputs.map { definition in
-                    try resolve(input: node.input(definition.name), definition: definition, owner: nodeKey, nodeColorSpace: node.element["colorspace"] ?? scope.colorSpace, in: scope)
-                }
-                nodeArguments[nodeKey] = arguments
-            }
-            var functionName = MetalNodeLibrary.functionName(for: nodeDef)
-            if nodeDef.outputs.count > 1 {
-                guard let outputName, nodeDef.outputs.contains(where: { $0.name == outputName }) else {
-                    throw MaterialXError.invalidDocument("multi-output node '\(nodeName)' read without a valid output (\(outputName ?? "none"))")
-                }
-                functionName += "_" + outputName
-            }
-            if stitcher.nodeLibrary.hasFunction(named: functionName) {
-                stitchingNode = try call(functionName, arguments)
-            } else if let implementation = stitcher.standardLibrary.nodeGraphs[nodeDef.name] {
-                let bindings = Dictionary(zip(nodeDef.inputs.map(\.name), arguments)) { first, _ in first }
-                stitchingNode = try inline(implementation, output: outputName, bindings: bindings, prefix: nodeKey + "/")
-            } else {
-                throw MaterialXError.unsupportedNode(functionName)
-            }
+            stitchingNode = try inline(implementation, output: outputName, bindings: bindings, prefix: nodeKey + "/")
+        case let .unsupported(reason):
+            throw MaterialXError.unsupportedNode(reason)
         }
         if let index = nodeIndices[ObjectIdentifier(stitchingNode)], origins[index] == nil {
             origins[index] = key
@@ -453,6 +450,11 @@ private struct Builder {
 }
 
 private extension ValueType {
+    /// Whether values of this type can be passed between stitched functions.
+    var isStitchable: Bool {
+        (try? metalSuffix()) != nil
+    }
+
     /// The suffix of the type-generic helper functions (`mx_parameter_*`, `mx_output_*`).
     func metalSuffix() throws -> String {
         switch self {

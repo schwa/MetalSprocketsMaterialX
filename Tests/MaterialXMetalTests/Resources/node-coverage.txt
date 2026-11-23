@@ -383,7 +383,6 @@ ND_switch_vector3I nodeGraph
 ND_switch_vector4 nodeGraph
 ND_switch_vector4I nodeGraph
 ND_texcoord_vector2 metal
-ND_texcoord_vector3 metal
 ND_transformmatrix_vector2M3 metal
 ND_transformmatrix_vector3 metal
 ND_transformmatrix_vector3M4 metal
