@@ -28,11 +28,13 @@ public extension StitchedGraph {
         try evaluate(contexts: texcoords.map(MXShadingContext.init(texcoord:)), textures: textures, residentTextures: residentTextures, device: device)
     }
 
-    /// An argument buffer of `MXTexture` slots for the graph's `textures` argument, in slot order. Samplers must be
-    /// created with `supportArgumentBuffers`. The textures must be made resident (for example with `useResource`)
-    /// by whoever encodes the draw or dispatch.
-    static func makeTextureTable(_ slots: [(texture: MTLTexture, sampler: MTLSamplerState)], device: MTLDevice) throws -> MTLBuffer {
-        let entries = slots.map { MXTexture(texture: $0.texture.gpuResourceID._impl, sampler: $0.sampler.gpuResourceID._impl) }
+    /// An argument buffer of `MXTexture` slots for the graph's `textures` argument, in slot order. A `nil` slot is
+    /// empty: image nodes reading it return their default. Samplers must be created with `supportArgumentBuffers`.
+    /// The textures must be made resident (for example with `useResource`) by whoever encodes the draw or dispatch.
+    static func makeTextureTable(_ slots: [(texture: MTLTexture, sampler: MTLSamplerState)?], device: MTLDevice) throws -> MTLBuffer {
+        let entries = slots.map { slot in
+            slot.map { MXTexture(texture: $0.texture.gpuResourceID._impl, sampler: $0.sampler.gpuResourceID._impl) } ?? MXTexture()
+        }
         let padded = entries.isEmpty ? [MXTexture()] : entries
         guard let buffer = device.makeBuffer(bytes: padded, length: MemoryLayout<MXTexture>.stride * padded.count) else {
             throw MaterialXError.stitchingFailed("could not create texture table")

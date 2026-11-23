@@ -43,6 +43,21 @@ typedef constant MXTexture *MXTextures;
     return textures[slot].texture.sample(textures[slot].sampler, texcoord);
 }
 
+// image: the stitcher passes the texture table, the slot it assigned to the file, then `default` and `texcoord`.
+// An empty slot (null texture) returns `default`. MaterialX's V runs up, Metal's down, so V is flipped.
+#define MX_IMAGE(SUFFIX, T, SWIZZLE) \
+    [[stitchable]] T mx_image_##SUFFIX(MXTextures textures, int slot, T fallback, float2 texcoord) { \
+        if (is_null_texture(textures[slot].texture)) { return fallback; } \
+        float4 sample = textures[slot].texture.sample(textures[slot].sampler, float2(texcoord.x, 1.0 - texcoord.y)); \
+        return SWIZZLE; \
+    }
+MX_IMAGE(float, float, sample.r)
+MX_IMAGE(vector2, float2, sample.rg)
+MX_IMAGE(vector3, float3, sample.rgb)
+MX_IMAGE(color3, float3, sample.rgb)
+MX_IMAGE(vector4, float4, sample)
+MX_IMAGE(color4, float4, sample)
+
 // MARK: Evaluation
 // Kernels that call a stitched graph through a visible function table, one result per context. Used by
 // StitchedGraph.evaluate for tools and tests.

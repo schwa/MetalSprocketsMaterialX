@@ -670,3 +670,82 @@ struct TextureTableTests {
         #expect(values == [[0, 0, 1, 1]])
     }
 }
+
+/// #18: image nodes read a texture slot per file; tiledimage goes through its nodegraph.
+@Suite(.serialized)
+struct ImageNodeTests {
+    static let source = """
+    <materialx version="1.39" fileprefix="textures/">
+      <nodegraph name="g">
+        <tiledimage name="tiled" type="color3">
+          <input name="file" type="filename" value="checker.png" />
+          <input name="uvtiling" type="vector2" value="2, 2" />
+          <input name="filtertype" type="string" value="closest" />
+        </tiledimage>
+        <image name="plain" type="float" fileprefix="masks/">
+          <input name="file" type="filename" value="mask.png" />
+          <input name="default" type="float" value="0.25" />
+        </image>
+        <multiply name="n" type="color3">
+          <input name="in1" type="color3" nodename="tiled" />
+          <input name="in2" type="float" nodename="plain" />
+        </multiply>
+        <output name="out" type="color3" nodename="n" />
+      </nodegraph>
+    </materialx>
+    """
+
+    /// 2×2: top row red, bottom row green (Metal's row 0 is the top).
+    func texture(device: MTLDevice) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 2, height: 2, mipmapped: false)
+        let texture = try #require(device.makeTexture(descriptor: descriptor))
+        let pixels: [SIMD4<UInt8>] = [[255, 0, 0, 255], [255, 0, 0, 255], [0, 255, 0, 255], [0, 255, 0, 255]]
+        texture.replace(region: MTLRegionMake2D(0, 0, 2, 2), mipmapLevel: 0, withBytes: pixels, bytesPerRow: 8)
+        return texture
+    }
+
+    @Test func imagesBindSlotsAndSample() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(Self.source.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph", documentFilePrefix: document.root["fileprefix"])
+
+        #expect(Set(stitched.textures.map(\.file)) == ["textures/checker.png", "masks/mask.png"])
+        #expect(Set(stitched.textures.map(\.slot)) == [0, 1])
+        let tiled = try #require(stitched.textures.first { $0.file == "textures/checker.png" })
+        #expect(tiled.filterType == "closest")
+        #expect(tiled.samplerDescriptor.minFilter == .nearest)
+        #expect(tiled.node.hasPrefix("tiled/"))
+
+        let checker = try texture(device: device)
+        let sampler = try #require(device.makeSamplerState(descriptor: tiled.samplerDescriptor))
+        // The mask's slot stays empty, so that image returns its default 0.25.
+        var slots = [(texture: MTLTexture, sampler: MTLSamplerState)?](repeating: nil, count: 2)
+        slots[tiled.slot] = (checker, sampler)
+        let table = try StitchedGraph.makeTextureTable(slots, device: device)
+        // UV (0.1, 0.1) tiled ×2 is (0.2, 0.2): near the bottom in MaterialX, so the bottom (green) row.
+        let values = try stitched.evaluate(at: [[0.1, 0.1], [0.1, 0.4]], textures: table, residentTextures: [checker], device: device)
+        #expect(values[0] == [0, 0.25, 0, 1])
+        // (0.1, 0.4) ×2 = (0.2, 0.8): the top (red) row.
+        #expect(values[1] == [0.25, 0, 0, 1])
+    }
+}
+
+/// Found with #18: a shader input reading one output of a document-level multi-output node lost its `output=`.
+@Suite(.serialized)
+struct DocumentLevelMultiOutputTests {
+    @Test func shaderInputKeepsOutputName() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39">
+          <separate3 name="parts" type="multioutput"><input name="in" type="color3" value="0.1, 0.2, 0.3" /></separate3>
+          <standard_surface name="s" type="surfaceshader"><input name="base" type="float" nodename="parts" output="outg" /></standard_surface>
+        </materialx>
+        """
+        let document = try Document(data: Data(xml.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let input = try #require(document.nodes.first { $0.name == "s" }?.input("base"))
+        let stitched = try stitcher.stitch(input, in: document, functionName: "materialx_graph")
+        #expect(try stitched.evaluate(at: [.zero]).first?.x == 0.2)
+    }
+}

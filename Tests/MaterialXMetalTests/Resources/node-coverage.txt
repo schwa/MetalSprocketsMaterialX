@@ -4,6 +4,8 @@ ND_UsdPrimvarReader_integer nodeGraph
 ND_UsdPrimvarReader_vector2 nodeGraph
 ND_UsdPrimvarReader_vector3 nodeGraph
 ND_UsdPrimvarReader_vector4 nodeGraph
+ND_UsdUVTexture nodeGraph
+ND_UsdUVTexture_23 nodeGraph
 ND_absval_color3 metal
 ND_absval_color4 metal
 ND_absval_float metal
@@ -217,6 +219,12 @@ ND_ifgreatereq_vector3 metal
 ND_ifgreatereq_vector3I metal
 ND_ifgreatereq_vector4 metal
 ND_ifgreatereq_vector4I metal
+ND_image_color3 metal
+ND_image_color4 metal
+ND_image_float metal
+ND_image_vector2 metal
+ND_image_vector3 metal
+ND_image_vector4 metal
 ND_in_color4 metal
 ND_inside_color3 metal
 ND_inside_color4 metal
@@ -405,6 +413,12 @@ ND_switch_vector4 nodeGraph
 ND_switch_vector4I nodeGraph
 ND_tangent_vector3 metal
 ND_texcoord_vector2 metal
+ND_tiledimage_color3 nodeGraph
+ND_tiledimage_color4 nodeGraph
+ND_tiledimage_float nodeGraph
+ND_tiledimage_vector2 nodeGraph
+ND_tiledimage_vector3 nodeGraph
+ND_tiledimage_vector4 nodeGraph
 ND_time_float metal
 ND_transformmatrix_vector2M3 metal
 ND_transformmatrix_vector3 metal

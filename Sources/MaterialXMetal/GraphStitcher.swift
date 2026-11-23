@@ -93,6 +93,8 @@ public struct StitchedGraph: @unchecked Sendable {
     public var parameterData: [SIMD4<Float>]
     /// ``parameterData`` as stitched, before any changes.
     public internal(set) var initialParameterData: [SIMD4<Float>] = []
+    /// The textures image nodes read, by slot of the `textures` argument.
+    public internal(set) var textures: [TextureBinding] = []
     /// The stitching graph, one line per function node with its arguments and the MaterialX node it came from.
     public internal(set) var graphDescription = ""
 
@@ -154,31 +156,33 @@ public struct GraphStitcher {
             guard let graph = document.nodeGraph(graphName) else {
                 throw MaterialXError.invalidDocument("input '\(input.name)' references missing nodegraph '\(graphName)'")
             }
-            return try stitch(graph, output: input.output, functionName: functionName, documentColorSpace: document.colorSpace)
+            return try stitch(graph, output: input.output, functionName: functionName, documentColorSpace: document.colorSpace, documentFilePrefix: document.root["fileprefix"])
         }
         if let nodeName = input.nodeName {
-            return try stitch(Self.documentLevelGraph(document, output: nodeName, type: input.type), functionName: functionName, documentColorSpace: document.colorSpace)
+            return try stitch(Self.documentLevelGraph(document, output: nodeName, outputName: input.output, type: input.type), functionName: functionName, documentColorSpace: document.colorSpace, documentFilePrefix: document.root["fileprefix"])
         }
         throw MaterialXError.invalidDocument("input '\(input.name)' is not connected")
     }
 
     /// The document's top-level nodes as one nodegraph whose single output reads `nodeName`.
-    static func documentLevelGraph(_ document: Document, output nodeName: String, type: ValueType) throws -> NodeGraph {
+    static func documentLevelGraph(_ document: Document, output nodeName: String, outputName: String? = nil, type: ValueType) throws -> NodeGraph {
         let skipped: Set<ValueType> = [.surfaceshader, .material]
         var children = document.nodes.filter { !skipped.contains($0.type) }.map(\.element)
-        children.append(Element(tag: "output", attributes: ["name": "out", "type": type.rawValue, "nodename": nodeName]))
+        var attributes = ["name": "out", "type": type.rawValue, "nodename": nodeName]
+        attributes["output"] = outputName
+        children.append(Element(tag: "output", attributes: attributes))
         return try NodeGraph(Element(tag: "nodegraph", attributes: ["name": "__document"], children: children))
     }
 
     /// Compiles `graph`'s output. Color constants tagged with a `colorspace` (on the input, its node, the graph, or
     /// `documentColorSpace`) are converted to lin_rec709; values with a `unit` are converted to ``targetUnits``.
-    public func stitch(_ graph: NodeGraph, output outputName: String? = nil, functionName: String, documentColorSpace: String? = nil) throws -> StitchedGraph {
-        try stitch(plan(graph, output: outputName, functionName: functionName, documentColorSpace: documentColorSpace))
+    public func stitch(_ graph: NodeGraph, output outputName: String? = nil, functionName: String, documentColorSpace: String? = nil, documentFilePrefix: String? = nil) throws -> StitchedGraph {
+        try stitch(plan(graph, output: outputName, functionName: functionName, documentColorSpace: documentColorSpace, documentFilePrefix: documentFilePrefix))
     }
 
     /// What ``stitch(_:output:functionName:documentColorSpace:)`` would build, without building it: the function
     /// calls, their wiring and the parameter layout. Nothing is compiled or run on the GPU.
-    public func plan(_ graph: NodeGraph, output outputName: String? = nil, functionName: String, documentColorSpace: String? = nil) throws -> GraphPlan {
+    public func plan(_ graph: NodeGraph, output outputName: String? = nil, functionName: String, documentColorSpace: String? = nil, documentFilePrefix: String? = nil) throws -> GraphPlan {
         guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
             throw MaterialXError.invalidDocument("nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
@@ -186,10 +190,10 @@ public struct GraphStitcher {
             throw MaterialXError.invalidDocument("output '\(output.name)' is not connected")
         }
         var builder = Builder(stitcher: self)
-        let scope = Builder.Scope(graph: graph, prefix: "", bindings: [:], colorSpace: graph.element["colorspace"] ?? documentColorSpace)
+        let scope = Builder.Scope(graph: graph, prefix: "", bindings: [:], colorSpace: graph.element["colorspace"] ?? documentColorSpace, strings: [:], filePrefix: graph.element["fileprefix"] ?? documentFilePrefix)
         let value = try builder.resolve(nodeName: nodeName, output: output.output, in: scope)
         _ = try builder.call("mx_output_" + output.type.metalSuffix(), [value, .context, .parameters, .textures])
-        return GraphPlan(functionName: functionName, outputType: output.type, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData)
+        return GraphPlan(functionName: functionName, outputType: output.type, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)
     }
 
     /// Builds `plan` with Metal function stitching, reusing a cached library when the wiring matches.
@@ -200,6 +204,7 @@ public struct GraphStitcher {
         var stitched = StitchedGraph(library: library, function: function, functionName: plan.functionName, outputType: plan.outputType, parameters: plan.parameters, parameterData: plan.parameterData)
         stitched.graphDescription = plan.description
         stitched.initialParameterData = plan.parameterData
+        stitched.textures = plan.textures
         return stitched
     }
 }
@@ -229,6 +234,8 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
     public var calls: [Call]
     public var parameters: [StitchedGraph.Parameter]
     public var parameterData: [SIMD4<Float>]
+    /// The textures image nodes read, by slot.
+    public var textures: [TextureBinding] = []
 
     /// The calls made for MaterialX node `origin`.
     public func calls(for origin: String) -> [Call] {
@@ -308,7 +315,13 @@ private struct Builder {
         var bindings: [String: GraphPlan.Operand]
         /// The inherited colorspace for color values. `nil` inside functional nodegraphs, whose constants are raw.
         var colorSpace: String?
+        /// String and filename interface inputs bound to the calling node's values (they cannot be stitched).
+        var strings: [String: Value]
+        /// The inherited `fileprefix`.
+        var filePrefix: String?
     }
+
+    var textures: [TextureBinding] = []
 
     let stitcher: GraphStitcher
     var calls: [GraphPlan.Call] = []
@@ -321,6 +334,33 @@ private struct Builder {
     /// The pointer to the current parameter slot.
     var slotPointer = GraphPlan.Operand.parameters
     var previousSlotCount = 0
+
+    static func input(_ name: String, of nodeDef: NodeDef) throws -> Input {
+        guard let input = nodeDef.input(name) else {
+            throw MaterialXError.invalidDocument("\(nodeDef.name) has no input '\(name)'")
+        }
+        return input
+    }
+
+    /// A string or filename input's value: set on the node, bound through the graph interface, or the default.
+    func stringValue(_ name: String, of node: Node, nodeDef: NodeDef, in scope: Scope) -> String? {
+        let input = node.input(name)
+        if case let .string(value)? = input?.value {
+            return value
+        }
+        if let interfaceName = input?.interfaceName {
+            if case let .string(value)? = scope.strings[interfaceName] {
+                return value
+            }
+            if case let .string(value)? = stitcher.standardLibrary.interfaceInput(interfaceName, of: scope.graph)?.value {
+                return value
+            }
+        }
+        if case let .string(value)? = nodeDef.input(name)?.value {
+            return value
+        }
+        return nil
+    }
 
     /// The nodedef inputs a Metal function takes: stitchable values, plus `space`, which becomes an integer. Other
     /// string inputs, such as geompropvalue's `geomprop` name, are resolved by the stitcher and not passed.
@@ -430,6 +470,22 @@ private struct Builder {
                 throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'; only UV sets 0 and 1 are available")
             }
             stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
+        case let .function(functionName) where node.category == "image":
+            let file = stringValue("file", of: node, nodeDef: nodeDef, in: scope) ?? ""
+            let filePrefix = node.input("file")?.element["fileprefix"] ?? node.element["fileprefix"] ?? scope.filePrefix ?? ""
+            let slot = textures.count
+            textures.append(TextureBinding(
+                node: nodeKey,
+                file: file.isEmpty ? "" : filePrefix + file,
+                slot: slot,
+                uAddressMode: stringValue("uaddressmode", of: node, nodeDef: nodeDef, in: scope) ?? "periodic",
+                vAddressMode: stringValue("vaddressmode", of: node, nodeDef: nodeDef, in: scope) ?? "periodic",
+                filterType: stringValue("filtertype", of: node, nodeDef: nodeDef, in: scope) ?? "linear"
+            ))
+            let slotParameter = try parameter(name: nodeKey + ".slot", type: .integer, value: .integer(slot))
+            let fallback = try argument(try Self.input("default", of: nodeDef))
+            let texcoord = try argument(try Self.input("texcoord", of: nodeDef))
+            stitchingNode = try call(functionName, [.textures, slotParameter, fallback, texcoord])
         case let .function(functionName) where Self.textureCategories.contains(node.category):
             stitchingNode = try call(functionName, [.textures] + Self.functionInputs(nodeDef).map(argument))
         case let .function(functionName) where Self.contextCategories.contains(node.category):
@@ -440,10 +496,16 @@ private struct Builder {
             // Inputs with no stitchable value type (filenames, strings) are left unbound; the graph only fails if it
             // reads one.
             var bindings: [String: GraphPlan.Operand] = [:]
-            for definition in nodeDef.inputs where definition.type.isStitchable {
-                bindings[definition.name] = try argument(definition)
+            var strings: [String: Value] = [:]
+            for definition in nodeDef.inputs {
+                if definition.type.isStitchable {
+                    bindings[definition.name] = try argument(definition)
+                } else if let value = stringValue(definition.name, of: node, nodeDef: nodeDef, in: scope) {
+                    strings[definition.name] = .string(value)
+                }
             }
-            stitchingNode = try inline(implementation, output: outputName, bindings: bindings, prefix: nodeKey + "/")
+            let filePrefix = node.element["fileprefix"] ?? scope.filePrefix
+            stitchingNode = try inline(implementation, output: outputName, bindings: bindings, strings: strings, filePrefix: filePrefix, prefix: nodeKey + "/")
         case let .unsupported(reason):
             throw MaterialXError.unsupportedNode(reason)
         }
@@ -454,12 +516,12 @@ private struct Builder {
         return stitchingNode
     }
 
-    mutating func inline(_ graph: NodeGraph, output outputName: String?, bindings: [String: GraphPlan.Operand], prefix: String) throws -> GraphPlan.Operand {
+    mutating func inline(_ graph: NodeGraph, output outputName: String?, bindings: [String: GraphPlan.Operand], strings: [String: Value] = [:], filePrefix: String? = nil, prefix: String) throws -> GraphPlan.Operand {
         guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
             throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
         if let nodeName = output.nodeName {
-            return try resolve(nodeName: nodeName, output: output.output, in: Scope(graph: graph, prefix: prefix, bindings: bindings, colorSpace: nil))
+            return try resolve(nodeName: nodeName, output: output.output, in: Scope(graph: graph, prefix: prefix, bindings: bindings, colorSpace: nil, strings: strings, filePrefix: filePrefix))
         }
         // A pass-through graph: the output reads an interface input directly.
         if let interfaceName = output.element["interfacename"], let bound = bindings[interfaceName] {
@@ -489,11 +551,34 @@ private struct Builder {
             return node
         }
         let name = "\(owner).\(definition.name)"
+        // An unset input with a defaultgeomprop (UV0, Nworld, …) reads the geometry instead of a constant.
+        if input?.value == nil, let geomProp = definition.element["defaultgeomprop"] {
+            return try geometry(geomProp, key: name)
+        }
         let value = input.map { converted($0.value ?? definition.value, input: $0, definition: definition) } ?? definition.value
         let node = try parameter(name: name, type: definition.type, value: value)
         // Only values the document sets carry its colorspace; nodedef defaults are already linear.
         guard input?.value != nil else { return node }
         return try convertColor(node, type: definition.type, colorSpace: input?.element["colorspace"] ?? nodeColorSpace, key: name)
+    }
+
+    /// A call reading geompropdef `name` (such as `UV0` or `Nworld`) from the shading context.
+    mutating func geometry(_ name: String, key: String) throws -> GraphPlan.Operand {
+        guard let definition = stitcher.standardLibrary.geomPropDefs[name], let category = definition["geomprop"], let type = definition["type"] else {
+            throw MaterialXError.unsupportedNode("defaultgeomprop '\(name)'")
+        }
+        var arguments: [GraphPlan.Operand] = [.context]
+        if let space = definition["space"] {
+            arguments.append(try parameter(name: key + ".space", type: .integer, value: .integer(Self.spaceCode(.string(space)))))
+        }
+        if category != "position", category != "normal" {
+            arguments.append(try parameter(name: key + ".index", type: .integer, value: .integer(Int(definition["index"] ?? "0") ?? 0)))
+        }
+        let call = try call("mx_\(category)_\(type)", arguments)
+        if case let .call(index) = call {
+            calls[index].origin = key + "#" + name
+        }
+        return call
     }
 
     /// `node` converted from `colorSpace` to lin_rec709 with the cmlib nodegraph, for color3/color4 values.

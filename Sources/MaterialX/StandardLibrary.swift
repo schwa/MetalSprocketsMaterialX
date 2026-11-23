@@ -6,6 +6,8 @@ public struct StandardLibrary: Sendable {
     public var typeDefs: [ValueType: TypeDef]
     /// Unit scales by unit type and unit name, from `<unitdef>`: `units["distance"]["inch"] == 0.0254`.
     public var units: [String: [String: Float]]
+    /// `<geompropdef>`s by name, such as `UV0` or `Nworld`, used by inputs with a `defaultgeomprop`.
+    public var geomPropDefs: [String: Element]
     /// Functional nodegraphs (`*_ng.mtlx`) keyed by the nodedef they implement.
     public var nodeGraphs: [String: NodeGraph]
     private var nodeDefsByCategory: [String: [NodeDef]]
@@ -44,10 +46,16 @@ public struct StandardLibrary: Sendable {
         var nodeDefs: [String: NodeDef] = [:]
         var typeDefs: [ValueType: TypeDef] = [:]
         var units: [String: [String: Float]] = [:]
+        var geomPropDefs: [String: Element] = [:]
         var nodeGraphs: [String: NodeGraph] = [:]
         var graphsByName: [String: NodeGraph] = [:]
         var implementations: [(nodeDef: String, nodeGraph: String)] = []
         for document in documents {
+            for geomPropDef in document.root.children(tag: "geompropdef") {
+                if let name = geomPropDef.name {
+                    geomPropDefs[name] = geomPropDef
+                }
+            }
             for unitDef in document.root.children(tag: "unitdef") {
                 guard let unitType = unitDef["unittype"] else { continue }
                 for unit in unitDef.children(tag: "unit") {
@@ -81,6 +89,7 @@ public struct StandardLibrary: Sendable {
         self.nodeGraphs = nodeGraphs
         self.typeDefs = typeDefs
         self.units = units
+        self.geomPropDefs = geomPropDefs
         nodeDefsByCategory = Dictionary(grouping: self.nodeDefs.values, by: \.node)
     }
 

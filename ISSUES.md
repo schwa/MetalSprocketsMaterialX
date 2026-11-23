@@ -313,19 +313,21 @@ texcoord nodes always read the single texcoord argument; index=1 (second UV set)
 ## 18: Image and texture nodes are not supported
 
 +++
-status: open
+status: closed
 priority: critical
 kind: feature
 labels: effort:l, area:nodes, area:textures
 depends: 22, 23
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:56:14Z
+updated: 2026-11-23T13:54:16Z
+closed: 2026-11-23T13:54:16Z
 +++
 
 image, tiledimage, triplanarprojection, hextiledimage, gltf_image/gltf_colorimage/gltf_normalmap and their uaddressmode, vaddressmode, filtertype, framerange, frameoffset, frameendaction, default and texcoord inputs have no implementation. Stitched functions have no way to reach textures or samplers today.
 
 - `2026-11-23T12:56:14Z`: Question 1 (decision): Implement image nodes only after #22 (shading context) and #23 (texture passing) are designed, with textures reaching stitched functions through an argument buffer of texture2d+sampler pairs indexed by a parameter slot? Recommended: Yes
 - `2026-11-23T13:40:41Z`: Answer 1: YES
+- `2026-11-23T13:54:16Z`: image (float/vector2/vector3/vector4/color3/color4) reads a texture slot: the stitcher assigns each image node a slot, records a TextureBinding (file with fileprefix, slot, address modes, filter, samplerDescriptor) on StitchedGraph.textures / GraphPlan.textures, and passes the slot index as a parameter, per #18-Q1. Empty slots return the node's default; V is flipped for Metal. tiledimage and other image graphs work through their nodegraphs (string/filename inputs now flow into functional graphs). Inputs with defaultgeomprop (UV0, Nworld, Pobject, ...) read the shading context when unset. Not covered: framerange/frameoffset/frameendaction, layer, [token]/UDIM expansion of filenames (FilenamePattern exists), 'constant' address mode is clamp-to-zero rather than the default value, triplanarprojection/hextiledimage (need more nodes). Also fixed: shader inputs reading an output of a document-level multi-output node lost the output name (DocumentLevelMultiOutputTests, failed before). Corpus: 84 shader inputs now stitch (was 1); remaining: normalmap 16, rotate2d 10, fractal3d 2. Tests: ImageNodeTests.
 
 ---
 
