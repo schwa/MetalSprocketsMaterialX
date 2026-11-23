@@ -22,6 +22,25 @@ struct DocumentTests {
         #expect(nodeDef.inputs.filter { $0.name == "base" }.count == 1)
     }
 
+    /// #1: xi:include pulls in elements from other files, relative to the including file. Cycles are an error.
+    @Test func xiIncludeIsFollowed() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("sub"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        func write(_ name: String, _ body: String) throws {
+            try Data("<?xml version=\"1.0\"?><materialx version=\"1.39\" xmlns:xi=\"http://www.w3.org/2001/XInclude\">\(body)</materialx>".utf8).write(to: directory.appendingPathComponent(name))
+        }
+        try write("main.mtlx", "<xi:include href=\"sub/defs.mtlx\" /><nodegraph name=\"main_graph\" />")
+        try write("sub/defs.mtlx", "<xi:include href=\"more.mtlx\" /><nodedef name=\"ND_a\" node=\"a\"><output name=\"out\" type=\"float\" /></nodedef>")
+        try write("sub/more.mtlx", "<nodegraph name=\"included_graph\" />")
+        let document = try Document(url: directory.appendingPathComponent("main.mtlx"))
+        #expect(document.nodeDefs.map(\.name) == ["ND_a"])
+        #expect(Set(document.nodeGraphs.map(\.name)) == ["main_graph", "included_graph"])
+
+        try write("loop.mtlx", "<xi:include href=\"loop.mtlx\" />")
+        #expect(throws: MaterialXError.self) { try Document(url: directory.appendingPathComponent("loop.mtlx")) }
+    }
+
     @Test func nodeDefMatchesFloatArgumentVariant() throws {
         let node = try Node(Element(tag: "multiply", attributes: ["name": "m", "type": "color3"], children: [
             Element(tag: "input", attributes: ["name": "in1", "type": "color3", "value": "1, 1, 1"]),

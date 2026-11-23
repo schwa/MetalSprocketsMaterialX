@@ -146,12 +146,43 @@ public struct Document: Sendable {
     /// Top-level nodes (shaders, materials, loose nodes).
     public var nodes: [Node]
 
+    /// Loads `url`, following `xi:include` hrefs relative to each including file.
     public init(url: URL) throws {
-        try self.init(data: Data(contentsOf: url))
+        try self.init(root: Self.load(url.standardizedFileURL, including: []))
     }
 
-    public init(data: Data) throws {
-        let root = try Element.parse(data)
+    /// Parses `data`. Relative `xi:include` hrefs resolve against `baseURL`; without one they are left unresolved.
+    public init(data: Data, baseURL: URL? = nil) throws {
+        var root = try Element.parse(data)
+        if let baseURL {
+            root = try Self.resolveIncludes(root, baseURL: baseURL, including: [])
+        }
+        try self.init(root: root)
+    }
+
+    private static func load(_ url: URL, including: Set<URL>) throws -> Element {
+        guard !including.contains(url) else {
+            throw MaterialXError.invalidDocument("xi:include cycle at \(url.path)")
+        }
+        let root = try Element.parse(Data(contentsOf: url))
+        return try resolveIncludes(root, baseURL: url.deletingLastPathComponent(), including: including.union([url]))
+    }
+
+    /// Replaces each top-level `xi:include` with the children of the included document's root.
+    private static func resolveIncludes(_ root: Element, baseURL: URL, including: Set<URL>) throws -> Element {
+        var result = root
+        result.children = try root.children.flatMap { child -> [Element] in
+            guard child.tag == "xi:include" else { return [child] }
+            guard let href = child["href"] else {
+                throw MaterialXError.invalidDocument("xi:include without href")
+            }
+            let url = URL(fileURLWithPath: href, relativeTo: baseURL).standardizedFileURL
+            return try load(url, including: including).children
+        }
+        return result
+    }
+
+    private init(root: Element) throws {
         guard root.tag == "materialx" else {
             throw MaterialXError.invalidDocument("root is <\(root.tag)>, not <materialx>")
         }

@@ -7,15 +7,18 @@ File format: <https://github.com/schwa/issues-format>
 ## 1: xi:include elements are not followed
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T12:57:50Z
+closed: 2026-11-23T12:57:50Z
 +++
 
 Documents that split definitions across files with <xi:include href=...> load only the top file. Included nodedefs, nodegraphs and materials are missing. Relative hrefs, search paths and include cycles are not handled.
+
+- `2026-11-23T12:57:50Z`: Document(url:) and Document(data:baseURL:) splice xi:include'd documents (relative to the including file, nested, cycles throw). Library search paths are not implemented. Test: xiIncludeIsFollowed.
 
 ---
 
