@@ -613,6 +613,9 @@ ND_transformmatrix_vector2M3 metal
 ND_transformmatrix_vector3 metal
 ND_transformmatrix_vector3M4 metal
 ND_transformmatrix_vector4 metal
+ND_transformnormal_vector3 metal
+ND_transformpoint_vector3 metal
+ND_transformvector_vector3 metal
 ND_transpose_matrix33 metal
 ND_transpose_matrix44 metal
 ND_trianglewave_float nodeGraph

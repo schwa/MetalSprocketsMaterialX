@@ -7,6 +7,8 @@ public extension MXShadingContext {
     /// color, and the viewer straight above.
     init(texcoord: SIMD2<Float>) {
         self.init()
+        objectToWorld = matrix_identity_float4x4
+        worldToObject = matrix_identity_float4x4
         positionWorld = .zero
         positionObject = .zero
         normalWorld = [0, 1, 0]

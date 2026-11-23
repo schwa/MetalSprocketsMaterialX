@@ -36,11 +36,7 @@ struct UnlitSurfaceTests {
     func render(_ graph: StitchedGraph) throws -> CGImage {
         let device = graph.library.device
         let buffer = try #require(device.makeBuffer(bytes: Self.quad, length: MemoryLayout<Float>.stride * Self.quad.count))
-        var uniforms = MXUnlitUniforms()
-        uniforms.modelViewProjection = matrix_identity_float4x4
-        uniforms.model = matrix_identity_float4x4
-        uniforms.normalMatrix = matrix_identity_float3x3
-        uniforms.cameraPosition = [0, 0, 1]
+        let uniforms = MXUnlitUniforms(model: matrix_identity_float4x4)
         let content = try RenderPass {
             try MaterialXUnlitSurface(graph: graph, uniforms: uniforms) {
                 Draw { $0.drawPrimitives(primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4) }

@@ -2,6 +2,26 @@ import MaterialXMetal
 import MaterialXMetalShaders
 import Metal
 import MetalSprockets
+import simd
+
+public extension MXUnlitUniforms {
+    /// Uniforms for drawing with `model` under `viewProjection`; the inverse and normal matrices are derived.
+    init(model: simd_float4x4 = matrix_identity_float4x4, viewProjection: simd_float4x4 = matrix_identity_float4x4, cameraPosition: SIMD3<Float> = [0, 0, 1], time: Float = 0, frame: Float = 0) {
+        self.init()
+        self.model = model
+        inverseModel = model.inverse
+        modelViewProjection = viewProjection * model
+        let upperLeft = simd_float3x3(model.columns.0.xyz, model.columns.1.xyz, model.columns.2.xyz)
+        normalMatrix = upperLeft.inverse.transpose
+        self.cameraPosition = cameraPosition
+        self.time = time
+        self.frame = frame
+    }
+}
+
+private extension SIMD4 where Scalar == Float {
+    var xyz: SIMD3<Float> { [x, y, z] }
+}
 
 /// Draws `content` with a stitched MaterialX graph as an unlit color: the fragment color is the graph's color3 or
 /// color4 output. Lit, PBR-shaded MaterialX surfaces are the PBR renderer's job (#34, #35).

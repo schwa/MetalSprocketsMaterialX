@@ -392,7 +392,12 @@ struct Builder {
     /// The nodedef inputs a Metal function takes: stitchable values, plus `space`, which becomes an integer. Other
     /// string inputs, such as geompropvalue's `geomprop` name, are resolved by the stitcher and not passed.
     static func functionInputs(_ nodeDef: NodeDef) -> [MaterialXInput] {
-        nodeDef.inputs.filter { $0.type.isStitchable || ($0.name == "space" && $0.type == .string) }
+        nodeDef.inputs.filter { $0.type.isStitchable || isSpaceInput($0) }
+    }
+
+    /// `space`, `fromspace` and `tospace` string inputs, passed to Metal as integers (``spaceCode(_:)``).
+    static func isSpaceInput(_ input: MaterialXInput) -> Bool {
+        input.type == .string && ["space", "fromspace", "tospace"].contains(input.name)
     }
 
     /// The integer the Metal geometry functions take for a `space` input: 0 object (and model), 1 world.
@@ -403,6 +408,7 @@ struct Builder {
         switch space {
         case "object", "model": return 0
         case "world": return 1
+        case "": return -1
         default: throw MaterialXError.invalidValue("space '\(space)'")
         }
     }
@@ -411,7 +417,7 @@ struct Builder {
     static let textureCategories: Set<String> = ["texture_slot"]
 
     /// Node categories whose functions take the shading context before the nodedef's inputs.
-    static let contextCategories: Set<String> = ["texcoord", "position", "normal", "tangent", "bitangent", "geomcolor", "viewdirection", "time", "frame", "realitykit_viewdirection"]
+    static let contextCategories: Set<String> = ["texcoord", "position", "normal", "tangent", "bitangent", "geomcolor", "viewdirection", "time", "frame", "realitykit_viewdirection", "transformpoint", "transformvector", "transformnormal"]
 
     /// `swizzle`'s `channels` string as the vector4 of indices `mx_swizzle_*` takes: 0–3 per component letter
     /// (`xyzw` or `rgba`), -1 for `0`, -2 for `1`.
@@ -499,8 +505,8 @@ struct Builder {
             if let cached = nodeArguments[argumentKey] {
                 return cached
             }
-            if definition.name == "space", definition.type == .string {
-                let argument = try parameter(name: argumentKey, type: .integer, value: .integer(Self.spaceCode(node.input("space")?.value ?? definition.value)))
+            if Self.isSpaceInput(definition) {
+                let argument = try parameter(name: argumentKey, type: .integer, value: .integer(Self.spaceCode(node.input(definition.name)?.value ?? definition.value)))
                 nodeArguments[argumentKey] = argument
                 return argument
             }

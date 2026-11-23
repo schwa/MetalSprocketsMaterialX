@@ -1265,14 +1265,18 @@ creatematrix, transpose, determinant, invertmatrix, and the matrix33/matrix44 va
 ## 65: Space transform nodes are missing
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, subtask, area:nodes, area:geometry
 created: 2026-11-23T14:32:25Z
+updated: 2026-11-23T14:39:39Z
+closed: 2026-11-23T14:39:39Z
 +++
 
 transformpoint, transformvector and transformnormal (fromspace/tospace object, world) have no implementation; MXShadingContext carries no object-to-world matrices. Acceptance: the nodes stitch and transform between object and world space using the context. Part of #11.
+
+- `2026-11-23T14:39:39Z`: transformpoint, transformvector and transformnormal (object/model/world; empty means unchanged) read new MXShadingContext.objectToWorld/worldToObject matrices; normals use the inverse transpose. fromspace/tospace strings become integer parameters like 'space'. MXUnlitUniforms gained inverseModel and a Swift init(model:viewProjection:cameraPosition:time:frame:) that derives the inverse and normal matrices; MaterialXUnlitSurface fills the context matrices from it. Tests: SpaceTransformTests (failed before); golden images unchanged.
 
 ---
 

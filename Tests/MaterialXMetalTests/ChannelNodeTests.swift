@@ -1226,3 +1226,45 @@ struct MatrixNodeTests {
         #expect(missing.isEmpty, "\(missing)")
     }
 }
+
+/// #65: space transforms use the context's object/world matrices.
+@Suite(.serialized)
+struct SpaceTransformTests {
+    func transform(_ category: String, from: String, to: String, value: String, context: MXShadingContext) throws -> SIMD3<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <\(category) name="n" type="vector3">
+            <input name="in" type="vector3" value="\(value)" />
+            <input name="fromspace" type="string" value="\(from)" /><input name="tospace" type="string" value="\(to)" />
+          </\(category)>
+          <output name="out" type="vector3" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try #require(try MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g"))
+        let result = try #require(try stitcher.stitch(graph, functionName: "space_test").evaluate(contexts: [context]).first)
+        return [result.x, result.y, result.z]
+    }
+
+    /// Object space scaled ×2 on X and moved by (10, 0, 0).
+    static var context: MXShadingContext {
+        var context = MXShadingContext(texcoord: .zero)
+        context.objectToWorld = simd_float4x4(columns: ([2, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [10, 0, 0, 1]))
+        context.worldToObject = context.objectToWorld.inverse
+        return context
+    }
+
+    @Test func pointsVectorsAndNormals() throws {
+        let context = Self.context
+        #expect(try transform("transformpoint", from: "object", to: "world", value: "1, 1, 1", context: context) == [12, 1, 1])
+        #expect(try transform("transformpoint", from: "world", to: "object", value: "12, 1, 1", context: context) == [1, 1, 1])
+        #expect(try transform("transformvector", from: "object", to: "world", value: "1, 1, 1", context: context) == [2, 1, 1])
+        // A normal on the X-scaled surface (1, 1, 0) leans toward Y in world space: inverse transpose.
+        let normal = try transform("transformnormal", from: "object", to: "world", value: "1, 1, 0", context: context)
+        #expect(simd_distance(normal, simd_normalize(SIMD3<Float>(0.5, 1, 0))) < 1e-5, "\(normal)")
+        // Same space, or unset spaces, leave the value alone.
+        #expect(try transform("transformpoint", from: "", to: "", value: "3, 4, 5", context: context) == [3, 4, 5])
+        #expect(try transform("transformpoint", from: "model", to: "object", value: "3, 4, 5", context: context) == [3, 4, 5])
+    }
+}

@@ -25,6 +25,9 @@ typedef simd_float4x4 MXFloat4x4;
 #endif
 
 typedef struct MXShadingContext {
+    /// For transformpoint/transformvector/transformnormal.
+    MXFloat4x4 objectToWorld;
+    MXFloat4x4 worldToObject;
     MXFloat3 positionWorld;
     MXFloat3 positionObject;
     MXFloat3 normalWorld;
@@ -77,6 +80,7 @@ typedef struct MXSurfaceInputs {
 typedef struct MXUnlitUniforms {
     MXFloat4x4 modelViewProjection;
     MXFloat4x4 model;
+    MXFloat4x4 inverseModel;
     /// Inverse transpose of the model matrix's upper 3×3.
     MXFloat3x3 normalMatrix;
     MXFloat3 cameraPosition;

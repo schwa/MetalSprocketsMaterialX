@@ -137,7 +137,25 @@ MX_EVALUATE(boolean, bool, float4(value ? 1.0 : 0.0, 0, 0, 1))
 // Geometric nodes take the shading context as their first argument, before the nodedef's inputs.
 [[stitchable]] float2 mx_texcoord_vector2(MXContext context, int index) { return context.texcoord[clamp(index, 0, 1)]; }
 
-// `space` arrives as an integer: 0 object (and model), 1 world. See Builder.spaceCode.
+// `space` arrives as an integer: 0 object (and model), 1 world, -1 unset. See Builder.spaceCode.
+
+// The matrix taking `from` space to `to` space; identity when they match or either is unset.
+static float4x4 mx_space_matrix(MXContext context, int from, int to) {
+    if (from < 0 || to < 0 || from == to) { return float4x4(1); }
+    return from == 0 ? context.objectToWorld : context.worldToObject;
+}
+[[stitchable]] float3 mx_transformpoint_vector3(MXContext context, float3 in, int fromspace, int tospace) {
+    return (mx_space_matrix(context, fromspace, tospace) * float4(in, 1)).xyz;
+}
+[[stitchable]] float3 mx_transformvector_vector3(MXContext context, float3 in, int fromspace, int tospace) {
+    return (mx_space_matrix(context, fromspace, tospace) * float4(in, 0)).xyz;
+}
+// Normals use the inverse transpose: the other direction's matrix, transposed.
+[[stitchable]] float3 mx_transformnormal_vector3(MXContext context, float3 in, int fromspace, int tospace) {
+    if (fromspace < 0 || tospace < 0 || fromspace == tospace) { return in; }
+    float4x4 inverse = fromspace == 0 ? context.worldToObject : context.objectToWorld;
+    return normalize((transpose(inverse) * float4(in, 0)).xyz);
+}
 [[stitchable]] float3 mx_position_vector3(MXContext context, int space) { return space == 1 ? context.positionWorld : context.positionObject; }
 [[stitchable]] float3 mx_normal_vector3(MXContext context, int space) { return space == 1 ? context.normalWorld : context.normalObject; }
 // The context has one tangent frame, so `index` (UV set) is ignored.

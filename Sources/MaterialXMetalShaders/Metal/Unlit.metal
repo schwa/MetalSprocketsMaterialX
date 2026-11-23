@@ -33,6 +33,8 @@ struct MXUnlitVertexOut {
 
 static MXShadingContext mx_unlit_context(MXUnlitVertexOut in, constant MXUnlitUniforms &uniforms) {
     MXShadingContext context = {};
+    context.objectToWorld = uniforms.model;
+    context.worldToObject = uniforms.inverseModel;
     context.positionWorld = in.positionWorld;
     context.positionObject = in.positionObject;
     context.normalWorld = normalize(in.normalWorld);

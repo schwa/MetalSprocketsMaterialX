@@ -87,14 +87,7 @@ private struct QuadView: View {
     ]
 
     static func uniforms(time: Float, frame: UInt32) -> MXUnlitUniforms {
-        var uniforms = MXUnlitUniforms()
-        uniforms.modelViewProjection = matrix_identity_float4x4
-        uniforms.model = matrix_identity_float4x4
-        uniforms.normalMatrix = matrix_identity_float3x3
-        uniforms.cameraPosition = [0, 0, 1]
-        uniforms.time = time
-        uniforms.frame = Float(frame)
-        return uniforms
+        MXUnlitUniforms(time: time, frame: Float(frame))
     }
 
     var body: some View {
