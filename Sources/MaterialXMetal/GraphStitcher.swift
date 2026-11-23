@@ -394,9 +394,9 @@ private struct Builder {
         }
         switch stitcher.resolution(of: nodeDef, output: outputName) {
         case let .function(functionName) where node.category == "texcoord":
-            // Only one UV set reaches the stitched function until the shading context grows (#22).
-            if let index = node.input("index")?.value?.numbers?.first, index != 0 {
-                throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'")
+            // MXShadingContext carries UV sets 0 and 1.
+            if let index = node.input("index")?.value?.numbers?.first, !(0...1).contains(index) {
+                throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'; only UV sets 0 and 1 are available")
             }
             stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
         case let .function(functionName) where Self.contextCategories.contains(node.category):

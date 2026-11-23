@@ -215,19 +215,25 @@ struct MultiOutputTests {
 /// #17: texcoord index 1 must not silently read UV set 0.
 @Suite(.serialized)
 struct TexcoordIndexTests {
-    @Test func secondUVSetIsRejected() throws {
+    func uv(index: Int) throws -> SIMD4<Float> {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let source = """
         <materialx version="1.39"><nodegraph name="g">
-          <texcoord name="n" type="vector2"><input name="index" type="integer" value="1" /></texcoord>
+          <texcoord name="n" type="vector2"><input name="index" type="integer" value="\(index)" /></texcoord>
           <output name="out" type="vector2" nodename="n" />
         </nodegraph></materialx>
         """
         let document = try Document(data: Data(source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        #expect(throws: MaterialXError.self) {
-            try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
-        }
+        let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
+        var context = MXShadingContext(texcoord: [0.1, 0.2])
+        context.texcoord.1 = [0.7, 0.8]
+        return try #require(try stitched.evaluate(contexts: [context]).first)
+    }
+
+    @Test func indexSelectsTheUVSet() throws {
+        #expect(try uv(index: 0) == [0.1, 0.2, 0, 1])
+        #expect(try uv(index: 1) == [0.7, 0.8, 0, 1])
     }
 }
 

@@ -291,18 +291,20 @@ position, normal, tangent, bitangent, geomcolor, geompropvalue, time, frame, vie
 ## 17: texcoord index input is ignored
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: effort:s, area:nodes, area:geometry
 depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:05:26Z
+updated: 2026-11-23T13:47:08Z
+closed: 2026-11-23T13:47:08Z
 +++
 
 texcoord nodes always read the single texcoord argument; index=1 (second UV set) behaves like index=0.
 
 - `2026-11-23T13:05:26Z`: texcoord with index != 0 now throws unsupportedNode instead of silently reading UV set 0 (test secondUVSetIsRejected). Reading the second set needs the shading context from #22.
+- `2026-11-23T13:47:08Z`: texcoord index 0 and 1 read MXShadingContext.texcoord[0/1] (#22); other indices throw unsupportedNode naming the limit. Test indexSelectsTheUVSet failed before (index 1 rejected).
 
 ---
 
