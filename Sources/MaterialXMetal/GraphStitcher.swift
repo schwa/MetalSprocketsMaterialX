@@ -67,6 +67,29 @@ public struct GraphStitcher {
         self.standardLibrary = standardLibrary
     }
 
+    /// Stitches what a shader input is connected to: a nodegraph output (`nodegraph`/`output`) or a document-level
+    /// node (`nodename`). Throws for unconnected inputs; read their ``Input/value`` instead.
+    public func stitch(_ input: Input, in document: Document, functionName: String) throws -> StitchedGraph {
+        if let graphName = input.nodeGraph {
+            guard let graph = document.nodeGraph(graphName) else {
+                throw MaterialXError.invalidDocument("input '\(input.name)' references missing nodegraph '\(graphName)'")
+            }
+            return try stitch(graph, output: input.output, functionName: functionName)
+        }
+        if let nodeName = input.nodeName {
+            return try stitch(Self.documentLevelGraph(document, output: nodeName, type: input.type), functionName: functionName)
+        }
+        throw MaterialXError.invalidDocument("input '\(input.name)' is not connected")
+    }
+
+    /// The document's top-level nodes as one nodegraph whose single output reads `nodeName`.
+    static func documentLevelGraph(_ document: Document, output nodeName: String, type: ValueType) throws -> NodeGraph {
+        let skipped: Set<ValueType> = [.surfaceshader, .material]
+        var children = document.nodes.filter { !skipped.contains($0.type) }.map(\.element)
+        children.append(Element(tag: "output", attributes: ["name": "out", "type": type.rawValue, "nodename": nodeName]))
+        return try NodeGraph(Element(tag: "nodegraph", attributes: ["name": "__document"], children: children))
+    }
+
     public func stitch(_ graph: NodeGraph, output outputName: String? = nil, functionName: String) throws -> StitchedGraph {
         guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
             throw MaterialXError.invalidDocument("nodegraph '\(graph.name)' has no output \(outputName ?? "")")

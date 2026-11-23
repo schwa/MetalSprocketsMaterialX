@@ -25,6 +25,17 @@ using namespace metal;
 [[stitchable]] float3 mx_output_vector3(float3 value, float2, constant float4 *) { return value; }
 [[stitchable]] float4 mx_output_vector4(float4 value, float2, constant float4 *) { return value; }
 
+// MARK: Procedural
+
+[[stitchable]] float mx_constant_float(float value) { return value; }
+[[stitchable]] float2 mx_constant_vector2(float2 value) { return value; }
+[[stitchable]] float3 mx_constant_vector3(float3 value) { return value; }
+[[stitchable]] float4 mx_constant_vector4(float4 value) { return value; }
+[[stitchable]] float3 mx_constant_color3(float3 value) { return value; }
+[[stitchable]] float4 mx_constant_color4(float4 value) { return value; }
+[[stitchable]] int mx_constant_integer(int value) { return value; }
+[[stitchable]] bool mx_constant_boolean(bool value) { return value; }
+
 // MARK: Geometry
 
 [[stitchable]] float2 mx_texcoord_vector2(float2 texcoord) { return texcoord; }

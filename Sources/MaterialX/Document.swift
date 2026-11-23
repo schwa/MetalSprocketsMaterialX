@@ -96,11 +96,13 @@ public struct Node: Hashable, Sendable {
     public var type: ValueType
     public var nodeDefName: String?
     public var inputs: [Input]
+    public var element: Element
 
     public init(_ element: Element) throws {
         guard let name = element.name, let type = element["type"] else {
             throw MaterialXError.invalidDocument("<\(element.tag)> node without name or type")
         }
+        self.element = element
         self.name = name
         category = element.tag
         self.type = ValueType(rawValue: type)

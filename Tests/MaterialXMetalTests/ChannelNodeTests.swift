@@ -56,3 +56,51 @@ struct ChannelNodeTests {
         #expect(value.x == 1 && value.y == 1 && value.z == 1)
     }
 }
+
+/// #26: shader inputs connected to nodegraph outputs or to document-level nodes can be stitched.
+@Suite(.serialized)
+struct ShaderInputStitchingTests {
+    static let source = """
+    <materialx version="1.39">
+      <nodegraph name="NG_colors">
+        <multiply name="m" type="color3">
+          <input name="in1" type="color3" value="0.2, 0.4, 0.6" />
+          <input name="in2" type="float" value="2" />
+        </multiply>
+        <output name="tinted" type="color3" nodename="m" />
+        <output name="other" type="color3" nodename="m" />
+      </nodegraph>
+      <constant name="rough_base" type="float"><input name="value" type="float" value="0.25" /></constant>
+      <add name="rough" type="float">
+        <input name="in1" type="float" nodename="rough_base" />
+        <input name="in2" type="float" value="0.5" />
+      </add>
+      <standard_surface name="shader" type="surfaceshader">
+        <input name="base_color" type="color3" nodegraph="NG_colors" output="tinted" />
+        <input name="specular_roughness" type="float" nodename="rough" />
+        <input name="metalness" type="float" value="1" />
+      </standard_surface>
+      <surfacematerial name="material" type="material">
+        <input name="surfaceshader" type="surfaceshader" nodename="shader" />
+      </surfacematerial>
+    </materialx>
+    """
+
+    @Test func stitchesShaderInputs() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(Self.source.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let shader = try #require(document.nodes.first { $0.name == "shader" })
+
+        let baseColor = try stitcher.stitch(try #require(shader.input("base_color")), in: document, functionName: "materialx_graph")
+        let color = try StitchingTests().evaluate(baseColor, device: device, returnType: "color3")[0]
+        #expect(abs(color.x - 0.4) < 1e-6 && abs(color.y - 0.8) < 1e-6 && abs(color.z - 1.2) < 1e-6)
+
+        let roughness = try stitcher.stitch(try #require(shader.input("specular_roughness")), in: document, functionName: "materialx_graph")
+        #expect(try StitchingTests().evaluate(roughness, device: device, returnType: "float")[0].x == 0.75)
+
+        #expect(throws: MaterialXError.self) {
+            try stitcher.stitch(try #require(shader.input("metalness")), in: document, functionName: "materialx_graph")
+        }
+    }
+}

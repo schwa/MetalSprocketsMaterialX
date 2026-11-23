@@ -402,15 +402,18 @@ Nodes with several outputs (separate3, artistic_ior, gltf_* nodes) and inputs wi
 ## 26: Top-level nodes and nodegraph references from shader inputs are not stitched
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:m, area:stitching
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T12:59:47Z
+closed: 2026-11-23T12:59:47Z
 +++
 
 GraphStitcher compiles a NodeGraph only. Shader inputs connected with nodegraph=... output=..., or to nodes declared at document level (outside any nodegraph), cannot be compiled.
+
+- `2026-11-23T12:59:47Z`: GraphStitcher.stitch(_:in:functionName:) stitches a shader input connected to a nodegraph output or a document-level node (top-level nodes wrapped in a synthetic graph). Added constant nodes. Test: ShaderInputStitchingTests.
 
 ---
 
