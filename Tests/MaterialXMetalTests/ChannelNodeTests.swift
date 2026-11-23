@@ -464,7 +464,7 @@ struct GraphDescriptionTests {
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
         let description = stitched.graphDescription
-        #expect(description.hasPrefix("materialx_graph(arg0: context, arg1: parameters):"))
+        #expect(description.hasPrefix("materialx_graph(arg0: context, arg1: parameters, arg2: textures):"))
         #expect(description.contains("mx_multiply_color3FA(") && description.contains("// scaled"))
         #expect(description.contains("mx_mix_color3(") && description.contains("// blend"))
         #expect(description.contains("mx_output_vector3("))
@@ -506,7 +506,7 @@ struct GraphPlanTests {
         let multiplyIndex = try #require(plan.calls.firstIndex(of: multiply))
         #expect(mix.arguments.first == .call(multiplyIndex))
         #expect(plan.calls.last?.function == "mx_output_vector3")
-        #expect(plan.calls.last?.arguments.suffix(2) == [.context, .parameters])
+        #expect(plan.calls.last?.arguments.suffix(3) == [.context, .parameters, .textures])
     }
 
     @Test func colorspaceConversionIsInlinedIntoThePlan() throws {
@@ -570,7 +570,7 @@ struct ShadingContextTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let plan = try stitcher.plan(try #require(Document(data: Data(StitchingTests.document.utf8)).nodeGraph("NG_test")), functionName: "f")
-        #expect(plan.description.hasPrefix("f(arg0: context, arg1: parameters):"))
+        #expect(plan.description.hasPrefix("f(arg0: context, arg1: parameters, arg2: textures):"))
         #expect(StitchedGraph.Argument.context.rawValue == 0)
     }
 }
@@ -621,5 +621,52 @@ struct GeometryNodeTests {
         #expect(throws: MaterialXError.self) {
             try evaluate("<position name=\"n\" type=\"vector3\"><input name=\"space\" type=\"string\" value=\"screen\" /></position>", type: "vector3", context: Self.context)
         }
+    }
+}
+
+/// #23: textures reach stitched graphs through the MXTexture argument buffer.
+@Suite(.serialized)
+struct TextureTableTests {
+    static let source = """
+    <materialx version="1.39">
+      <nodedef name="ND_texture_slot_color4" node="texture_slot">
+        <input name="slot" type="integer" value="0" />
+        <input name="texcoord" type="vector2" value="0, 0" />
+        <output name="out" type="color4" />
+      </nodedef>
+      <nodegraph name="g">
+        <texcoord name="uv" type="vector2" />
+        <texture_slot name="n" type="color4">
+          <input name="slot" type="integer" value="1" />
+          <input name="texcoord" type="vector2" nodename="uv" />
+        </texture_slot>
+        <output name="out" type="color4" nodename="n" />
+      </nodegraph>
+    </materialx>
+    """
+
+    func solidTexture(_ color: SIMD4<UInt8>, device: MTLDevice) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 2, height: 2, mipmapped: false)
+        let texture = try #require(device.makeTexture(descriptor: descriptor))
+        let pixels = [SIMD4<UInt8>](repeating: color, count: 4)
+        texture.replace(region: MTLRegionMake2D(0, 0, 2, 2), mipmapLevel: 0, withBytes: pixels, bytesPerRow: 8)
+        return texture
+    }
+
+    @Test func graphSamplesTheTextureInItsSlot() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(Self.source.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: StandardLibrary.shared.merging([document]))
+        let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
+        #expect(stitched.graphDescription.contains("mx_texture_slot_color4(arg2,"))
+
+        let samplerDescriptor = MTLSamplerDescriptor()
+        samplerDescriptor.supportArgumentBuffers = true
+        let sampler = try #require(device.makeSamplerState(descriptor: samplerDescriptor))
+        let red = try solidTexture([255, 0, 0, 255], device: device)
+        let blue = try solidTexture([0, 0, 255, 255], device: device)
+        let table = try StitchedGraph.makeTextureTable([(red, sampler), (blue, sampler)], device: device)
+        let values = try stitched.evaluate(at: [[0.5, 0.5]], textures: table, residentTextures: [red, blue], device: device)
+        #expect(values == [[0, 0, 1, 1]])
     }
 }

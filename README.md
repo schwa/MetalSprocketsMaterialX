@@ -46,8 +46,11 @@ let function = try graph.visibleFunction() // a MetalSprockets VisibleFunction
 
 ```metal
 #include "MXShadingContext.h" // from MaterialXMetalShaders
-[[visible]] T graph(thread const MXShadingContext &context, constant float4 *parameters);
+[[visible]] T graph(thread const MXShadingContext &context, constant float4 *parameters, constant MXTexture *textures);
 ```
+
+- `textures` is an argument buffer of `MXTexture` (texture + sampler) slots. Build one with
+  `StitchedGraph.makeTextureTable(_:device:)`; the encoder must make the textures resident.
 
 - `context` is the surface point: world and object position, normal, tangent and bitangent, view direction, two UV
   sets, vertex color, time and frame. The caller (a fragment shader) fills it in; geometric nodes read it.

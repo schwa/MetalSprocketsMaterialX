@@ -407,19 +407,21 @@ The stitched function is T(float2 texcoord, constant float4 *parameters). There 
 ## 23: Textures and samplers cannot be passed through stitched graphs
 
 +++
-status: open
+status: closed
 priority: critical
 kind: feature
 labels: effort:l, area:stitching, area:textures
 depends: 22
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:56:27Z
+updated: 2026-11-23T13:50:29Z
+closed: 2026-11-23T13:50:29Z
 +++
 
 Image nodes need texture and sampler access. Whether [[stitchable]] functions can take texture2d/sampler arguments or must go through an argument buffer, and how that interacts with residency in MetalSprockets, is not investigated.
 
 - `2026-11-23T12:56:27Z`: Question 1 (design): Pass textures to stitched functions through an argument buffer (array of texture2d+sampler) given as a third graph argument, with image nodes taking a slot index from the parameter buffer? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T13:50:29Z`: Stitched graphs take a third argument, constant MXTexture *textures: an argument buffer of texture2d<float> + sampler slots (MXShadingContext.h; Swift side is two GPU resource IDs). Texture-reading node functions get the table first; mx_texture_slot_color4(textures, slot, uv) samples a slot whose index comes from the parameter buffer, as recommended. StitchedGraph.makeTextureTable(_:device:) builds the buffer; evaluate(...textures:residentTextures:) binds it. Image nodes map filenames to slots in #18. Test: TextureTableTests (samples slot 1 of two solid textures).
 
 ---
 

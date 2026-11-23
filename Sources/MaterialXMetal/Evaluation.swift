@@ -24,14 +24,26 @@ public extension MXShadingContext {
 
 public extension StitchedGraph {
     /// Runs the graph on the GPU once per texture coordinate, with ``MXShadingContext/init(texcoord:)`` contexts.
-    func evaluate(at texcoords: [SIMD2<Float>], device: MTLDevice? = nil) throws -> [SIMD4<Float>] {
-        try evaluate(contexts: texcoords.map(MXShadingContext.init(texcoord:)), device: device)
+    func evaluate(at texcoords: [SIMD2<Float>], textures: MTLBuffer? = nil, residentTextures: [MTLTexture] = [], device: MTLDevice? = nil) throws -> [SIMD4<Float>] {
+        try evaluate(contexts: texcoords.map(MXShadingContext.init(texcoord:)), textures: textures, residentTextures: residentTextures, device: device)
+    }
+
+    /// An argument buffer of `MXTexture` slots for the graph's `textures` argument, in slot order. Samplers must be
+    /// created with `supportArgumentBuffers`. The textures must be made resident (for example with `useResource`)
+    /// by whoever encodes the draw or dispatch.
+    static func makeTextureTable(_ slots: [(texture: MTLTexture, sampler: MTLSamplerState)], device: MTLDevice) throws -> MTLBuffer {
+        let entries = slots.map { MXTexture(texture: $0.texture.gpuResourceID._impl, sampler: $0.sampler.gpuResourceID._impl) }
+        let padded = entries.isEmpty ? [MXTexture()] : entries
+        guard let buffer = device.makeBuffer(bytes: padded, length: MemoryLayout<MXTexture>.stride * padded.count) else {
+            throw MaterialXError.stitchingFailed("could not create texture table")
+        }
+        return buffer
     }
 
     /// Runs the graph on the GPU once per context and returns the results widened to `float4`: missing components
     /// are 0 and a missing fourth component is 1; booleans and integers become floats. Uses the current
     /// ``parameterData``. For debugging, tools and tests, not rendering.
-    func evaluate(contexts: [MXShadingContext], device: MTLDevice? = nil) throws -> [SIMD4<Float>] {
+    func evaluate(contexts: [MXShadingContext], textures: MTLBuffer? = nil, residentTextures: [MTLTexture] = [], device: MTLDevice? = nil) throws -> [SIMD4<Float>] {
         guard !contexts.isEmpty else { return [] }
         let device = device ?? library.device
         let shaders = try device.makeDefaultLibrary(bundle: .materialXMetalShaders())
@@ -70,6 +82,11 @@ public extension StitchedGraph {
         encoder.setBuffer(parameterBuffer, offset: 0, index: 1)
         encoder.setBuffer(output, offset: 0, index: 2)
         encoder.setVisibleFunctionTable(table, bufferIndex: 3)
+        let textureTable = try textures ?? Self.makeTextureTable([], device: device)
+        encoder.setBuffer(textureTable, offset: 0, index: 4)
+        for texture in residentTextures {
+            encoder.useResource(texture, usage: .read)
+        }
         let width = min(contexts.count, pipeline.maxTotalThreadsPerThreadgroup)
         encoder.dispatchThreads(MTLSize(width: contexts.count, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: width, height: 1, depth: 1))
         encoder.endEncoding()

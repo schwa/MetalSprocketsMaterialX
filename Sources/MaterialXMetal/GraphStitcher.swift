@@ -64,8 +64,8 @@ public final class MetalNodeLibrary: @unchecked Sendable {
 
 /// A nodegraph output compiled into one visible function with `MTLFunctionStitchingGraph`.
 ///
-/// Signature: `T functionName(thread const MXShadingContext &context, constant float4 *parameters)` (see
-/// `MXShadingContext.h`), where `T` is the Metal type of
+/// Signature: `T functionName(thread const MXShadingContext &context, constant float4 *parameters,
+/// constant MXTexture *textures)` (see `MXShadingContext.h`), where `T` is the Metal type of
 /// ``outputType``. ``parameterData`` holds the constant inputs; edit it (by ``parameters``) to change values without
 /// re-stitching.
 public struct StitchedGraph: @unchecked Sendable {
@@ -82,6 +82,7 @@ public struct StitchedGraph: @unchecked Sendable {
     public enum Argument: Int, CaseIterable, Sendable {
         case context = 0
         case parameters = 1
+        case textures = 2
     }
 
     public let library: MTLLibrary
@@ -187,7 +188,7 @@ public struct GraphStitcher {
         var builder = Builder(stitcher: self)
         let scope = Builder.Scope(graph: graph, prefix: "", bindings: [:], colorSpace: graph.element["colorspace"] ?? documentColorSpace)
         let value = try builder.resolve(nodeName: nodeName, output: output.output, in: scope)
-        _ = try builder.call("mx_output_" + output.type.metalSuffix(), [value, .context, .parameters])
+        _ = try builder.call("mx_output_" + output.type.metalSuffix(), [value, .context, .parameters, .textures])
         return GraphPlan(functionName: functionName, outputType: output.type, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData)
     }
 
@@ -210,6 +211,8 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
         case context
         /// Argument 1 of the stitched function, or the parameter pointer before it is advanced.
         case parameters
+        /// Argument 2 of the stitched function: the `MXTexture` table.
+        case textures
         /// The result of `calls[index]`.
         case call(Int)
     }
@@ -241,7 +244,7 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
         let lines = calls.enumerated().map { index, call in
             "  n\(index) = \(Self.line(call))" + (call.origin.map { "  // \($0)" } ?? "")
         }
-        return "\(functionName)(arg0: context, arg1: parameters):\n" + lines.joined(separator: "\n")
+        return "\(functionName)(arg0: context, arg1: parameters, arg2: textures):\n" + lines.joined(separator: "\n")
     }
 
     static func line(_ call: Call) -> String {
@@ -249,6 +252,7 @@ public struct GraphPlan: Hashable, Sendable, CustomStringConvertible {
             switch operand {
             case .context: "arg0"
             case .parameters: "arg1"
+            case .textures: "arg2"
             case let .call(index): "n\(index)"
             }
         }
@@ -261,6 +265,7 @@ extension MetalNodeLibrary {
         let inputs = [
             GraphPlan.Operand.context: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.context.rawValue),
             .parameters: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.parameters.rawValue),
+            .textures: MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.textures.rawValue),
         ]
         var nodes: [MTLFunctionStitchingFunctionNode] = []
         var functions: [String: MTLFunction] = [:]
@@ -334,6 +339,9 @@ private struct Builder {
         default: throw MaterialXError.invalidValue("space '\(space)'")
         }
     }
+
+    /// Node categories whose functions take the texture table before the nodedef's inputs.
+    static let textureCategories: Set<String> = ["texture_slot"]
 
     /// Node categories whose functions take the shading context before the nodedef's inputs.
     static let contextCategories: Set<String> = ["texcoord", "position", "normal", "tangent", "bitangent", "geomcolor", "viewdirection", "time", "frame"]
@@ -422,6 +430,8 @@ private struct Builder {
                 throw MaterialXError.unsupportedNode("texcoord index \(Int(index)) on '\(nodeName)'; only UV sets 0 and 1 are available")
             }
             stitchingNode = try call(functionName, [.context] + nodeDef.inputs.map(argument))
+        case let .function(functionName) where Self.textureCategories.contains(node.category):
+            stitchingNode = try call(functionName, [.textures] + Self.functionInputs(nodeDef).map(argument))
         case let .function(functionName) where Self.contextCategories.contains(node.category):
             stitchingNode = try call(functionName, [.context] + Self.functionInputs(nodeDef).map(argument))
         case let .function(functionName):

@@ -42,21 +42,21 @@ struct StitchingPerformanceTests {
     """
 
     static let kernel = contextPrelude + """
-    [[visible]] float3 materialx_graph(thread const MXShadingContext &context, constant float4 *parameters);
+    [[visible]] float3 materialx_graph(thread const MXShadingContext &context, constant float4 *parameters, constant MXTexture *textures);
     kernel void evaluate(device float4 *out [[buffer(0)]], constant float4 *parameters [[buffer(1)]], uint id [[thread_position_in_grid]]) {
         MXShadingContext context = contextAt(id);
-        out[id] = float4(materialx_graph(context, parameters), 1);
+        out[id] = float4(materialx_graph(context, parameters, nullptr), 1);
     }
     """
 
     /// Calls the graph through a visible function table, as MetalSprockets' `.binary` linking does. Binary functions
     /// cannot satisfy a direct `[[visible]]` call ("unresolved visible function reference").
     static let tableKernel = contextPrelude + """
-    using Graph = float3(thread const MXShadingContext &, constant float4 *);
+    using Graph = float3(thread const MXShadingContext &, constant float4 *, constant MXTexture *);
     kernel void evaluate(device float4 *out [[buffer(0)]], constant float4 *parameters [[buffer(1)]],
                          visible_function_table<Graph> table [[buffer(2)]], uint id [[thread_position_in_grid]]) {
         MXShadingContext context = contextAt(id);
-        out[id] = float4(table[0](context, parameters), 1);
+        out[id] = float4(table[0](context, parameters, nullptr), 1);
     }
     """
 

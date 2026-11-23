@@ -2,8 +2,10 @@
 #include "MXShadingContext.h"
 using namespace metal;
 
-// Stitched graphs have the signature `T graph(thread const MXShadingContext &context, constant float4 *parameters)`.
+// Stitched graphs have the signature
+// `T graph(thread const MXShadingContext &context, constant float4 *parameters, constant MXTexture *textures)`.
 typedef thread const MXShadingContext &MXContext;
+typedef constant MXTexture *MXTextures;
 
 // Stitchable implementations of MaterialX stdlib nodes. Each function is named after its nodedef with `ND_` replaced
 // by `mx_`, and takes the nodedef's inputs in declaration order.
@@ -27,12 +29,19 @@ typedef thread const MXShadingContext &MXContext;
 // Stitching drops graph arguments no node reads, which would change the function's signature. The output node takes
 // every argument so the signature stays the same.
 
-[[stitchable]] float mx_output_float(float value, MXContext, constant float4 *) { return value; }
-[[stitchable]] float2 mx_output_vector2(float2 value, MXContext, constant float4 *) { return value; }
-[[stitchable]] float3 mx_output_vector3(float3 value, MXContext, constant float4 *) { return value; }
-[[stitchable]] float4 mx_output_vector4(float4 value, MXContext, constant float4 *) { return value; }
-[[stitchable]] int mx_output_integer(int value, MXContext, constant float4 *) { return value; }
-[[stitchable]] bool mx_output_boolean(bool value, MXContext, constant float4 *) { return value; }
+[[stitchable]] float mx_output_float(float value, MXContext, constant float4 *, MXTextures) { return value; }
+[[stitchable]] float2 mx_output_vector2(float2 value, MXContext, constant float4 *, MXTextures) { return value; }
+[[stitchable]] float3 mx_output_vector3(float3 value, MXContext, constant float4 *, MXTextures) { return value; }
+[[stitchable]] float4 mx_output_vector4(float4 value, MXContext, constant float4 *, MXTextures) { return value; }
+[[stitchable]] int mx_output_integer(int value, MXContext, constant float4 *, MXTextures) { return value; }
+[[stitchable]] bool mx_output_boolean(bool value, MXContext, constant float4 *, MXTextures) { return value; }
+
+// MARK: Textures
+// Texture-reading functions take the texture table first. `slot` comes from the parameter buffer.
+
+[[stitchable]] float4 mx_texture_slot_color4(MXTextures textures, int slot, float2 texcoord) {
+    return textures[slot].texture.sample(textures[slot].sampler, texcoord);
+}
 
 // MARK: Evaluation
 // Kernels that call a stitched graph through a visible function table, one result per context. Used by
@@ -40,10 +49,10 @@ typedef thread const MXShadingContext &MXContext;
 
 #define MX_EVALUATE(SUFFIX, T, WIDEN) \
     kernel void mx_evaluate_##SUFFIX(device const MXShadingContext *contexts [[buffer(0)]], constant float4 *parameters [[buffer(1)]], \
-                                     device float4 *out [[buffer(2)]], visible_function_table<T(MXContext, constant float4 *)> graph [[buffer(3)]], \
-                                     uint id [[thread_position_in_grid]]) { \
+                                     device float4 *out [[buffer(2)]], visible_function_table<T(MXContext, constant float4 *, MXTextures)> graph [[buffer(3)]], \
+                                     MXTextures textures [[buffer(4)]], uint id [[thread_position_in_grid]]) { \
         MXShadingContext context = contexts[id]; \
-        T value = graph[0](context, parameters); \
+        T value = graph[0](context, parameters, textures); \
         out[id] = WIDEN; \
     }
 MX_EVALUATE(float, float, float4(value, 0, 0, 1))

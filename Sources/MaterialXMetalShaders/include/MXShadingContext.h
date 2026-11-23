@@ -1,8 +1,12 @@
 #pragma once
 
-// The surface point a stitched MaterialX graph is evaluated at. Shared by Metal and Swift: a fragment shader fills one
-// in and passes it to the stitched function `T graph(thread const MXShadingContext &context, constant float4 *parameters)`.
-// Geometric nodes (texcoord, position, normal, tangent, bitangent, geomcolor, viewdirection, time, frame) read it.
+// The inputs of a stitched MaterialX graph, shared by Metal and Swift:
+//
+//     T graph(thread const MXShadingContext &context, constant float4 *parameters, constant MXTexture *textures)
+//
+// A fragment shader fills in the context; geometric nodes (texcoord, position, normal, tangent, bitangent, geomcolor,
+// viewdirection, time, frame) read it. `textures` is an argument buffer of texture/sampler pairs; image nodes read
+// the slot their parameter names.
 
 #ifdef __METAL_VERSION__
 #include <metal_stdlib>
@@ -35,3 +39,18 @@ typedef struct MXShadingContext {
     float time;
     float frame;
 } MXShadingContext;
+
+// One texture slot. In Swift, write the texture's and sampler's gpuResourceID (the sampler needs
+// supportArgumentBuffers).
+#ifdef __METAL_VERSION__
+struct MXTexture {
+    metal::texture2d<float> texture;
+    metal::sampler sampler;
+};
+#else
+#include <stdint.h>
+typedef struct MXTexture {
+    uint64_t texture;
+    uint64_t sampler;
+} MXTexture;
+#endif
