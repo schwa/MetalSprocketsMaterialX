@@ -22,6 +22,7 @@ public struct ValueType: RawRepresentable, Hashable, Sendable, CustomStringConve
     public static let filename = Self(rawValue: "filename")
     public static let surfaceshader = Self(rawValue: "surfaceshader")
     public static let material = Self(rawValue: "material")
+    public static let multioutput = Self(rawValue: "multioutput")
 
     /// Number of float components for numeric types, `nil` otherwise.
     public var componentCount: Int? {

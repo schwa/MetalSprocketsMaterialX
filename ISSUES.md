@@ -390,15 +390,18 @@ Every parameter takes one float4 slot, including floats. parameterData is [SIMD4
 ## 25: Multi-output nodes and nodegraph outputs are not supported
 
 +++
-status: open
+status: closed
 priority: high
 kind: feature
 labels: effort:l, area:stitching
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:02:50Z
+closed: 2026-11-23T13:02:50Z
 +++
 
 Nodes with several outputs (separate3, artistic_ior, gltf_* nodes) and inputs with output="..." are ignored by GraphStitcher. stitch() also compiles one nodegraph output at a time; a surface shader with many connected inputs needs one function per input or one function with several results.
+
+- `2026-11-23T13:02:50Z`: Multi-output nodes: one Metal function per output (mx_<nodedef>_<output>), output= references resolve per output with shared inputs, type="multioutput" nodedef matching, functional graphs select the requested output, separate2/3/4 implemented. One stitched function still returns one value; filling all shader inputs at once is part of #34. Tests: MultiOutputTests.
 
 ---
 

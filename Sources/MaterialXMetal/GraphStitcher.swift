@@ -105,7 +105,7 @@ public struct GraphStitcher {
             throw MaterialXError.invalidDocument("output '\(output.name)' is not connected")
         }
         var builder = Builder(stitcher: self)
-        let value = try builder.resolve(nodeName: nodeName, in: .init(graph: graph, prefix: "", bindings: nil))
+        let value = try builder.resolve(nodeName: nodeName, output: output.output, in: .init(graph: graph, prefix: "", bindings: nil))
         let outputNode = try builder.call("mx_output_" + output.type.metalSuffix(), [value, builder.texcoord, builder.parametersArgument])
         let stitchingGraph = MTLFunctionStitchingGraph(functionName: functionName, nodes: builder.functionNodes, outputNode: outputNode, attributes: [])
         let descriptor = MTLStitchedLibraryDescriptor()
@@ -132,6 +132,7 @@ private struct Builder {
     var functions: [String: MTLFunction] = [:]
     var functionNodes: [MTLFunctionStitchingFunctionNode] = []
     var resolved: [String: MTLFunctionStitchingNode] = [:]
+    var nodeArguments: [String: [MTLFunctionStitchingNode]] = [:]
     var visiting: Set<String> = []
     var parameters: [StitchedGraph.Parameter] = []
     var parameterData: [SIMD4<Float>] = []
@@ -153,8 +154,10 @@ private struct Builder {
         return node
     }
 
-    mutating func resolve(nodeName: String, in scope: Scope) throws -> MTLFunctionStitchingNode {
-        let key = scope.prefix + nodeName
+    /// The stitching node for `output` of `nodeName` (the only output when `nil`).
+    mutating func resolve(nodeName: String, output outputName: String? = nil, in scope: Scope) throws -> MTLFunctionStitchingNode {
+        let nodeKey = scope.prefix + nodeName
+        let key = nodeKey + (outputName.map { "." + $0 } ?? "")
         if let node = resolved[key] {
             return node
         }
@@ -174,15 +177,28 @@ private struct Builder {
             guard let nodeDef = stitcher.standardLibrary.nodeDef(for: node) else {
                 throw MaterialXError.missingNodeDef(node: "\(node.name) (\(node.category), \(node.type))")
             }
-            let arguments = try nodeDef.inputs.map { definition in
-                try resolve(input: node.input(definition.name), definition: definition, owner: key, in: scope)
+            // Inputs are resolved once per node, so every output of a multi-output node shares them.
+            let arguments: [MTLFunctionStitchingNode]
+            if let cached = nodeArguments[nodeKey] {
+                arguments = cached
+            } else {
+                arguments = try nodeDef.inputs.map { definition in
+                    try resolve(input: node.input(definition.name), definition: definition, owner: nodeKey, in: scope)
+                }
+                nodeArguments[nodeKey] = arguments
             }
-            let functionName = MetalNodeLibrary.functionName(for: nodeDef)
+            var functionName = MetalNodeLibrary.functionName(for: nodeDef)
+            if nodeDef.outputs.count > 1 {
+                guard let outputName, nodeDef.outputs.contains(where: { $0.name == outputName }) else {
+                    throw MaterialXError.invalidDocument("multi-output node '\(nodeName)' read without a valid output (\(outputName ?? "none"))")
+                }
+                functionName += "_" + outputName
+            }
             if stitcher.nodeLibrary.hasFunction(named: functionName) {
                 stitchingNode = try call(functionName, arguments)
             } else if let implementation = stitcher.standardLibrary.nodeGraphs[nodeDef.name] {
                 let bindings = Dictionary(zip(nodeDef.inputs.map(\.name), arguments)) { first, _ in first }
-                stitchingNode = try inline(implementation, bindings: bindings, prefix: key + "/")
+                stitchingNode = try inline(implementation, output: outputName, bindings: bindings, prefix: nodeKey + "/")
             } else {
                 throw MaterialXError.unsupportedNode(functionName)
             }
@@ -191,12 +207,12 @@ private struct Builder {
         return stitchingNode
     }
 
-    mutating func inline(_ graph: NodeGraph, bindings: [String: MTLFunctionStitchingNode], prefix: String) throws -> MTLFunctionStitchingNode {
-        guard let output = graph.outputs.first else {
-            throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no output")
+    mutating func inline(_ graph: NodeGraph, output outputName: String?, bindings: [String: MTLFunctionStitchingNode], prefix: String) throws -> MTLFunctionStitchingNode {
+        guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
+            throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
         if let nodeName = output.nodeName {
-            return try resolve(nodeName: nodeName, in: Scope(graph: graph, prefix: prefix, bindings: bindings))
+            return try resolve(nodeName: nodeName, output: output.output, in: Scope(graph: graph, prefix: prefix, bindings: bindings))
         }
         // A pass-through graph: the output reads an interface input directly.
         if let interfaceName = output.element["interfacename"], let bound = bindings[interfaceName] {
@@ -207,7 +223,7 @@ private struct Builder {
 
     mutating func resolve(input: Input?, definition: Input, owner: String, in scope: Scope) throws -> MTLFunctionStitchingNode {
         if let upstream = input?.nodeName {
-            return try resolve(nodeName: upstream, in: scope)
+            return try resolve(nodeName: upstream, output: input?.output, in: scope)
         }
         if let interfaceName = input?.interfaceName {
             if let bound = scope.bindings?[interfaceName] {

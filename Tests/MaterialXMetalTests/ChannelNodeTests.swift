@@ -6,7 +6,7 @@ import Testing
 /// #12: channel and conversion nodes.
 @Suite(.serialized)
 struct ChannelNodeTests {
-    static let channelCategories: Set<String> = ["extract", "combine2", "combine3", "combine4", "convert"]
+    static let channelCategories: Set<String> = ["extract", "combine2", "combine3", "combine4", "convert", "separate2", "separate3", "separate4"]
 
     @Test func everyChannelNodeDefHasAMetalFunction() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
@@ -15,7 +15,11 @@ struct ChannelNodeTests {
             Self.channelCategories.contains($0.node) && $0.outputs.first?.type != .surfaceshader
         }
         #expect(nodeDefs.count > 40)
-        let missing = nodeDefs.map(MetalNodeLibrary.functionName).filter { (try? nodeLibrary.function(named: $0)) == nil }.sorted()
+        let functionNames = nodeDefs.flatMap { nodeDef in
+            let base = MetalNodeLibrary.functionName(for: nodeDef)
+            return nodeDef.outputs.count > 1 ? nodeDef.outputs.map { base + "_" + $0.name } : [base]
+        }
+        let missing = functionNames.filter { !nodeLibrary.hasFunction(named: $0) }.sorted()
         #expect(missing.isEmpty, "\(missing)")
     }
 
@@ -147,5 +151,62 @@ struct FunctionalNodeGraphTests {
         // ((0.1, 0.2, 0.3) * 2 + 0.5) * 1 + 0.5
         let value = try StitchingTests().evaluate(stitched, device: device)[0]
         #expect(abs(value.x - 1.2) < 1e-5 && abs(value.y - 1.4) < 1e-5 && abs(value.z - 1.6) < 1e-5)
+    }
+}
+
+/// #25: multi-output nodes, output= references and choosing a nodegraph output.
+@Suite(.serialized)
+struct MultiOutputTests {
+    static let source = """
+    <materialx version="1.39">
+      <nodedef name="ND_split_halves" node="split_halves">
+        <input name="in" type="vector4" value="0, 0, 0, 0" />
+        <output name="low" type="vector2" />
+        <output name="high" type="vector2" />
+      </nodedef>
+      <nodegraph name="NG_split_halves" nodedef="ND_split_halves">
+        <separate4 name="parts" type="multioutput"><input name="in" type="vector4" interfacename="in" /></separate4>
+        <combine2 name="low_pair" type="vector2">
+          <input name="in1" type="float" nodename="parts" output="outx" />
+          <input name="in2" type="float" nodename="parts" output="outy" />
+        </combine2>
+        <combine2 name="high_pair" type="vector2">
+          <input name="in1" type="float" nodename="parts" output="outz" />
+          <input name="in2" type="float" nodename="parts" output="outw" />
+        </combine2>
+        <output name="low" type="vector2" nodename="low_pair" />
+        <output name="high" type="vector2" nodename="high_pair" />
+      </nodegraph>
+      <nodegraph name="g">
+        <separate3 name="parts" type="multioutput"><input name="in" type="color3" value="0.1, 0.2, 0.3" /></separate3>
+        <combine3 name="swapped" type="color3">
+          <input name="in1" type="float" nodename="parts" output="outb" />
+          <input name="in2" type="float" nodename="parts" output="outg" />
+          <input name="in3" type="float" nodename="parts" output="outr" />
+        </combine3>
+        <split_halves name="halves" type="multioutput"><input name="in" type="vector4" value="1, 2, 3, 4" /></split_halves>
+        <output name="swapped" type="color3" nodename="swapped" />
+        <output name="high" type="vector2" nodename="halves" output="high" />
+      </nodegraph>
+    </materialx>
+    """
+
+    func stitch(output: String) throws -> (StitchedGraph, MTLDevice) {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(Self.source.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: StandardLibrary.shared.merging([document]))
+        return (try stitcher.stitch(try #require(document.nodeGraph("g")), output: output, functionName: "materialx_graph"), device)
+    }
+
+    @Test func separateOutputsShareOneInput() throws {
+        let (stitched, device) = try stitch(output: "swapped")
+        #expect(stitched.parameters.count == 1)
+        let value = try StitchingTests().evaluate(stitched, device: device)[0]
+        #expect(value == [0.3, 0.2, 0.1, 1])
+    }
+
+    @Test func functionalGraphOutputIsSelected() throws {
+        let (stitched, device) = try stitch(output: "high")
+        #expect(try StitchingTests().evaluate(stitched, device: device, returnType: "vector2")[0] == [3, 4, 0, 1])
     }
 }

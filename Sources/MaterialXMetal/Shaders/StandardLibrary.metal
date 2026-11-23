@@ -91,6 +91,26 @@ MX_MIX(color4_color4, float4, float4)
 [[stitchable]] float4 mx_combine4_color4(float in1, float in2, float in3, float in4) { return float4(in1, in2, in3, in4); }
 [[stitchable]] float4 mx_combine4_vector4(float in1, float in2, float in3, float in4) { return float4(in1, in2, in3, in4); }
 
+// Multi-output nodes: one function per output, named mx_<nodedef>_<output>.
+#define MX_SEPARATE(SUFFIX, T, OUT, COMPONENT) \
+    [[stitchable]] float mx_##SUFFIX##_##OUT(T in) { return in.COMPONENT; }
+MX_SEPARATE(separate2_vector2, float2, outx, x)
+MX_SEPARATE(separate2_vector2, float2, outy, y)
+MX_SEPARATE(separate3_vector3, float3, outx, x)
+MX_SEPARATE(separate3_vector3, float3, outy, y)
+MX_SEPARATE(separate3_vector3, float3, outz, z)
+MX_SEPARATE(separate3_color3, float3, outr, r)
+MX_SEPARATE(separate3_color3, float3, outg, g)
+MX_SEPARATE(separate3_color3, float3, outb, b)
+MX_SEPARATE(separate4_vector4, float4, outx, x)
+MX_SEPARATE(separate4_vector4, float4, outy, y)
+MX_SEPARATE(separate4_vector4, float4, outz, z)
+MX_SEPARATE(separate4_vector4, float4, outw, w)
+MX_SEPARATE(separate4_color4, float4, outr, r)
+MX_SEPARATE(separate4_color4, float4, outg, g)
+MX_SEPARATE(separate4_color4, float4, outb, b)
+MX_SEPARATE(separate4_color4, float4, outa, a)
+
 #define MX_EXTRACT(SUFFIX, T, N) \
     [[stitchable]] float mx_extract_##SUFFIX(T in, int index) { return in[clamp(index, 0, N - 1)]; }
 MX_EXTRACT(vector2, float2, 2)

@@ -84,7 +84,9 @@ public struct StandardLibrary: Sendable {
         if let name = node.nodeDefName {
             return nodeDefs[name]
         }
-        let candidates = (nodeDefsByCategory[node.category] ?? []).filter { $0.outputs.first?.type == node.type }
+        let candidates = (nodeDefsByCategory[node.category] ?? []).filter { nodeDef in
+            node.type == .multioutput ? nodeDef.outputs.count > 1 : nodeDef.outputs.first?.type == node.type
+        }
         let matching = candidates.filter { nodeDef in
             node.inputs.allSatisfy { input in nodeDef.input(input.name)?.type == resolveType(input) }
         }
