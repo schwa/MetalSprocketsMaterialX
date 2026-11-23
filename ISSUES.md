@@ -43,15 +43,18 @@ Nodedefs such as ND_standard_surface_surfaceshader declare inherit="ND_standard_
 ## 3: Nodedef versioning is ignored
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:s, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:06:47Z
+closed: 2026-11-23T13:06:47Z
 +++
 
 MaterialX nodedefs have version and isdefaultversion attributes, and nodes can request a version. StandardLibrary picks a nodedef by category and types only, so a document that asks for an older version of a node gets an arbitrary one.
+
+- `2026-11-23T13:06:47Z`: NodeDef reads version/isdefaultversion, Node reads version. nodeDef(for:) requires an exact version match when the node asks for one and otherwise prefers the default version. Test: nodeDefVersionSelection.
 
 ---
 

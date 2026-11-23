@@ -41,6 +41,18 @@ struct DocumentTests {
         #expect(throws: MaterialXError.self) { try Document(url: directory.appendingPathComponent("loop.mtlx")) }
     }
 
+    /// #3: a node's version attribute picks the matching nodedef; without one the default version wins.
+    @Test func nodeDefVersionSelection() throws {
+        func node(_ attributes: [String: String]) throws -> Node {
+            try Node(Element(tag: "standard_surface", attributes: ["name": "s", "type": "surfaceshader"].merging(attributes) { $1 }))
+        }
+        let library = StandardLibrary.shared
+        #expect(library.nodeDef(for: try node([:]))?.name == "ND_standard_surface_surfaceshader")
+        #expect(library.nodeDef(for: try node(["version": "1.0.0"]))?.name == "ND_standard_surface_surfaceshader_100")
+        #expect(library.nodeDef(for: try node(["version": "1.0.1"]))?.name == "ND_standard_surface_surfaceshader")
+        #expect(library.nodeDef(for: try node(["version": "9.9"])) == nil)
+    }
+
     @Test func nodeDefMatchesFloatArgumentVariant() throws {
         let node = try Node(Element(tag: "multiply", attributes: ["name": "m", "type": "color3"], children: [
             Element(tag: "input", attributes: ["name": "in1", "type": "color3", "value": "1, 1, 1"]),

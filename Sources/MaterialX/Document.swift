@@ -56,6 +56,8 @@ public struct NodeDef: Hashable, Sendable {
     public var nodeGroup: String?
     /// The nodedef this one inherits inputs and outputs from.
     public var inherit: String?
+    public var version: String?
+    public var isDefaultVersion: Bool
     public var inputs: [Input]
     public var outputs: [Output]
 
@@ -67,6 +69,8 @@ public struct NodeDef: Hashable, Sendable {
         self.node = node
         nodeGroup = element["nodegroup"]
         inherit = element["inherit"]
+        version = element["version"]
+        isDefaultVersion = element["isdefaultversion"] == "true"
         inputs = try element.children(tag: "input").map(Input.init)
         outputs = try element.children(tag: "output").map(Output.init)
     }
@@ -95,6 +99,8 @@ public struct Node: Hashable, Sendable {
     public var category: String
     public var type: ValueType
     public var nodeDefName: String?
+    /// The requested nodedef version, if any.
+    public var version: String?
     public var inputs: [Input]
     public var element: Element
 
@@ -107,6 +113,7 @@ public struct Node: Hashable, Sendable {
         category = element.tag
         self.type = ValueType(rawValue: type)
         nodeDefName = element["nodedef"]
+        version = element["version"]
         inputs = try element.children(tag: "input").map(Input.init)
     }
 

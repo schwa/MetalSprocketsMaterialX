@@ -85,14 +85,17 @@ public struct StandardLibrary: Sendable {
             return nodeDefs[name]
         }
         let candidates = (nodeDefsByCategory[node.category] ?? []).filter { nodeDef in
-            node.type == .multioutput ? nodeDef.outputs.count > 1 : nodeDef.outputs.first?.type == node.type
+            let typeMatches = node.type == .multioutput ? nodeDef.outputs.count > 1 : nodeDef.outputs.first?.type == node.type
+            // A requested version must match exactly. Without one, any version may match; the default is preferred.
+            let versionMatches = node.version.map { $0 == nodeDef.version } ?? true
+            return typeMatches && versionMatches
         }
         let matching = candidates.filter { nodeDef in
             node.inputs.allSatisfy { input in nodeDef.input(input.name)?.type == resolveType(input) }
         }
-        // Prefer the nodedef with the fewest inputs the node did not set, then by name for stability.
+        // Prefer the default version, then the fewest inputs, then by name for stability.
         return matching.min { lhs, rhs in
-            (lhs.inputs.count, lhs.name) < (rhs.inputs.count, rhs.name)
+            (lhs.isDefaultVersion ? 0 : 1, lhs.inputs.count, lhs.name) < (rhs.isDefaultVersion ? 0 : 1, rhs.inputs.count, rhs.name)
         }
     }
 }
