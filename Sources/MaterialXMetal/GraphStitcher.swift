@@ -71,7 +71,10 @@ public struct StitchedGraph: @unchecked Sendable {
         /// `node.input` for node inputs, or the graph interface input's name.
         public var name: String
         public var type: ValueType
+        /// The first slot in ``StitchedGraph/parameterData``.
         public var slot: Int
+        /// 1, or the column count for matrices.
+        public var slotCount: Int
     }
 
     public enum Argument: Int, CaseIterable, Sendable {
@@ -169,6 +172,7 @@ private struct Builder {
     let parametersArgument = MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.parameters.rawValue)
     /// The pointer to the current parameter slot.
     var slotPointer: MTLFunctionStitchingNode
+    var previousSlotCount = 0
     let texcoord = MTLFunctionStitchingInputNode(argumentIndex: StitchedGraph.Argument.texcoord.rawValue)
 
     init(stitcher: GraphStitcher) {
@@ -291,17 +295,32 @@ private struct Builder {
 
     mutating func parameter(name: String, type: ValueType, value: Value?) throws -> MTLFunctionStitchingNode {
         let reader = try "mx_parameter_" + type.metalSuffix()
-        var slot = SIMD4<Float>.zero
-        for (index, number) in (value?.numbers ?? []).prefix(4).enumerated() {
-            slot[index] = number
-        }
-        // Advance lazily so the graph has no unused trailing node.
-        if !parameterData.isEmpty {
+        let slots = Self.slots(for: type, numbers: value?.numbers ?? [])
+        // Advance lazily, past the previous parameter's slots, so the graph has no unused trailing node.
+        for _ in 0..<previousSlotCount {
             slotPointer = try call("mx_parameter_next", [slotPointer])
         }
-        parameters.append(.init(name: name, type: type, slot: parameterData.count))
-        parameterData.append(slot)
+        previousSlotCount = slots.count
+        parameters.append(.init(name: name, type: type, slot: parameterData.count, slotCount: slots.count))
+        parameterData += slots
         return try call(reader, [slotPointer])
+    }
+
+    /// The float4 slots holding a value: one for scalars and vectors, one per column (3 or 4 floats) for matrices.
+    static func slots(for type: ValueType, numbers: [Float]) -> [SIMD4<Float>] {
+        let width = switch type {
+        case .matrix33: 3
+        case .matrix44: 4
+        default: 4
+        }
+        let count = type == .matrix33 ? 3 : type == .matrix44 ? 4 : 1
+        return (0..<count).map { column in
+            var slot = SIMD4<Float>.zero
+            for index in 0..<width where column * width + index < numbers.count {
+                slot[index] = numbers[column * width + index]
+            }
+            return slot
+        }
     }
 }
 
@@ -315,6 +334,8 @@ private extension ValueType {
         case .vector4, .color4: "vector4"
         case .integer: "integer"
         case .boolean: "boolean"
+        case .matrix33: "matrix33"
+        case .matrix44: "matrix44"
         default: throw MaterialXError.unsupportedNode("value of type \(self)")
         }
     }

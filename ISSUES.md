@@ -654,15 +654,18 @@ surface_unlit, nprlib nodes (facingratio, viewdirection-based nodes) and gltf_un
 ## 40: Color management library (cmlib) is not implemented
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:m, area:color, area:nodes
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:11:03Z
+closed: 2026-11-23T13:11:03Z
 +++
 
 cmlib_defs.mtlx / cmlib_ng.mtlx colorspace transforms (srgb_texture_to_lin_rec709, acescg, etc.) have no Metal implementation, so colorspace conversions cannot happen inside graphs.
+
+- `2026-11-23T13:11:03Z`: All 20 cmlib *_to_lin_rec709 transforms stitch through cmlib_ng.mtlx. Added power (all variants), transformmatrix (vector3/vector4/vector2M3/vector3M4), matrix33/44 constants and matrix parameters (one float4 slot per column, Parameter.slotCount). Tests: ColorManagementTests (sRGB decode and ACEScg matrix checked numerically).
 
 ---
 

@@ -15,6 +15,9 @@ using namespace metal;
 [[stitchable]] float4 mx_parameter_vector4(constant float4 *slot) { return *slot; }
 [[stitchable]] int mx_parameter_integer(constant float4 *slot) { return int(slot->x); }
 [[stitchable]] bool mx_parameter_boolean(constant float4 *slot) { return slot->x != 0; }
+// Matrices take one slot per column, in MaterialX value order (as GLSL's matN constructor fills columns).
+[[stitchable]] float3x3 mx_parameter_matrix33(constant float4 *slot) { return float3x3(slot[0].xyz, slot[1].xyz, slot[2].xyz); }
+[[stitchable]] float4x4 mx_parameter_matrix44(constant float4 *slot) { return float4x4(slot[0], slot[1], slot[2], slot[3]); }
 
 // MARK: Output
 // Stitching drops graph arguments no node reads, which would change the function's signature. The output node takes
@@ -37,6 +40,8 @@ using namespace metal;
 [[stitchable]] float4 mx_constant_color4(float4 value) { return value; }
 [[stitchable]] int mx_constant_integer(int value) { return value; }
 [[stitchable]] bool mx_constant_boolean(bool value) { return value; }
+[[stitchable]] float3x3 mx_constant_matrix33(float3x3 value) { return value; }
+[[stitchable]] float4x4 mx_constant_matrix44(float4x4 value) { return value; }
 
 // MARK: Geometry
 
@@ -66,6 +71,25 @@ MX_BINARY_ALL(multiply, in1 * in2)
 MX_BINARY_ALL(divide, in1 / in2)
 MX_BINARY_ALL(max, max(in1, decltype(in1)(in2)))
 MX_BINARY_ALL(min, min(in1, decltype(in1)(in2)))
+
+#define MX_POWER(SUFFIX, T, U) \
+    [[stitchable]] T mx_power_##SUFFIX(T in1, U in2) { return pow(in1, T(in2)); }
+MX_POWER(float, float, float)
+MX_POWER(vector2, float2, float2)
+MX_POWER(vector3, float3, float3)
+MX_POWER(vector4, float4, float4)
+MX_POWER(color3, float3, float3)
+MX_POWER(color4, float4, float4)
+MX_POWER(vector2FA, float2, float)
+MX_POWER(vector3FA, float3, float)
+MX_POWER(vector4FA, float4, float)
+MX_POWER(color3FA, float3, float)
+MX_POWER(color4FA, float4, float)
+
+[[stitchable]] float3 mx_transformmatrix_vector3(float3 in, float3x3 mat) { return mat * in; }
+[[stitchable]] float4 mx_transformmatrix_vector4(float4 in, float4x4 mat) { return mat * in; }
+[[stitchable]] float2 mx_transformmatrix_vector2M3(float2 in, float3x3 mat) { return (mat * float3(in, 1)).xy; }
+[[stitchable]] float3 mx_transformmatrix_vector3M4(float3 in, float4x4 mat) { return (mat * float4(in, 1)).xyz; }
 
 #define MX_MIX(SUFFIX, T, M) \
     [[stitchable]] T mx_mix_##SUFFIX(T fg, T bg, M mix) { return metal::mix(bg, fg, mix); }

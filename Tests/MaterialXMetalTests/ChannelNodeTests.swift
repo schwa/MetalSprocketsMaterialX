@@ -1,6 +1,7 @@
 import Foundation
 import Metal
 import MetalSprocketsMaterialX
+import simd
 import Testing
 
 /// #12: channel and conversion nodes.
@@ -302,5 +303,39 @@ struct ConditionalNodeTests {
         </ifequal>
         """, type: "float")
         #expect(value.x == 1)
+    }
+}
+
+/// #40: cmlib colorspace transforms stitch through their nodegraphs.
+@Suite(.serialized)
+struct ColorManagementTests {
+    func transform(_ category: String, _ color: String) throws -> SIMD4<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <\(category) name="n" type="color3"><input name="in" type="color3" value="\(color)" /></\(category)>
+          <output name="out" type="color3" nodename="n" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        return try StitchingTests().evaluate(stitched, device: device)[0]
+    }
+
+    @Test(arguments: StandardLibrary.shared.nodeDefs.values.filter { $0.name.hasSuffix("_to_lin_rec709_color3") }.map(\.node))
+    func everyColorSpaceTransformStitches(category: String) throws {
+        let value = try transform(category, "0.5, 0.5, 0.5")
+        #expect(value.x.isFinite && value.x > 0)
+    }
+
+    @Test func srgbTextureDecodes() throws {
+        let value = try transform("srgb_texture_to_lin_rec709", "0.5, 0.01, 1")
+        let expected = SIMD3<Float>(pow((0.5 + 0.055) / 1.055, 2.4), 0.01 / 12.92, 1)
+        #expect(simd_distance(SIMD3(value.x, value.y, value.z), expected) < 1e-5, "\(value)")
+    }
+
+    @Test func acescgMatrixIsApplied() throws {
+        let value = try transform("acescg_to_lin_rec709", "1, 0, 0")
+        #expect(simd_distance(SIMD3(value.x, value.y, value.z), [1.70505, -0.13026, -0.02400]) < 1e-3, "\(value)")
     }
 }
