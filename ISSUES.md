@@ -726,6 +726,8 @@ updated: 2026-11-23T12:55:47Z
 
 This package must not depend on SceneSprockets (SceneSprockets will depend on it), yet the PBR renderer it targets lives in SceneSprockets' MetalSprocketsPBR target. Where the PBR bridge code lives is undecided.
 
+- `2026-11-23T13:16:20Z`: Question 1 (decision): Put the MaterialX→PBR bridge in SceneSprockets (e.g. extend SceneSprocketsMaterialX to depend on this package), keeping MetalSprocketsMaterialX free of any SceneSprockets dependency? Recommended: Yes
+
 ---
 
 ## 44: No hot reload of .mtlx files
