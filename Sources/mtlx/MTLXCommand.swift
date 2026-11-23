@@ -87,7 +87,7 @@ extension MTLXCommand {
                     print("✓ \(label): \(stitched.outputType), \(stitched.parameters.count) parameters")
                     for parameter in stitched.parameters {
                         let slots = stitched.parameterData[parameter.slot..<(parameter.slot + parameter.slotCount)]
-                        let value = slots.map { slot in (0..<4).map { "\(slot[$0])" }.joined(separator: ", ") }.joined(separator: " | ")
+                        let value = ParameterLayout.decode(slots, as: parameter.type).map { "\($0)" }.joined(separator: ", ")
                         print("    [\(parameter.slot)] \(parameter.name): \(parameter.type) = \(value)")
                     }
                     if graph {

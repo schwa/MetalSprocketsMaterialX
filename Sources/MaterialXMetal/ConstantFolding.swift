@@ -27,7 +27,9 @@ public extension GraphStitcher {
         // folded value.
         let roots = calls.indices.filter { index in
             guard isConstant[index], let type = calls[index].valueType, foldable.contains(type),
-                  !calls[index].function.hasPrefix("mx_parameter_") else { return false }
+                  !calls[index].function.hasPrefix("mx_parameter_") else {
+                return false
+            }
             return consumers[index].contains { !isConstant[$0] }
         }
         guard !roots.isEmpty else { return plan }
@@ -42,10 +44,10 @@ public extension GraphStitcher {
             result.parameterData.append(value)
             var pointer = GraphPlan.Operand.parameters
             for _ in 0..<slot {
-                result.calls.append(.init(function: "mx_parameter_next", arguments: [pointer]))
+                result.calls.append(.init(function: ParameterLayout.advanceFunction, arguments: [pointer]))
                 pointer = .call(result.calls.count - 1)
             }
-            result.calls.append(.init(function: "mx_parameter_" + (try type.metalSuffix()), arguments: [pointer], origin: (calls[root].origin ?? "n\(root)") + "#folded", valueType: type))
+            result.calls.append(.init(function: try ParameterLayout.readFunction(for: type), arguments: [pointer], origin: (calls[root].origin ?? "n\(root)") + "#folded", valueType: type))
             replacements[root] = .call(result.calls.count - 1)
             result.parameters.append(.init(name: (calls[root].origin ?? "n\(root)") + "#folded", type: type, slot: slot, slotCount: 1))
         }
@@ -59,7 +61,7 @@ public extension GraphStitcher {
         }
         result.calls = Self.reachableInOrder(result.calls, from: plan.calls.count - 1)
         // Parameter readers are tagged with their parameter's name; parameters with no reader left are dropped.
-        let read = Set(result.calls.compactMap { call in call.function.hasPrefix("mx_parameter_") && call.function != "mx_parameter_next" ? call.origin : nil })
+        let read = Set(result.calls.compactMap { call in ParameterLayout.isReadFunction(call.function) ? call.origin : nil })
         result.parameters = result.parameters.filter { read.contains($0.name) }
         return result
     }

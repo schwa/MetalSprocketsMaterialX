@@ -941,3 +941,63 @@ struct ConstantFoldingTests {
         #expect(folded.parameter("u.index") != nil) // a bare parameter read is not folded
     }
 }
+
+/// #59: ParameterLayout and the Metal parameter readers agree for every type.
+@Suite(.serialized)
+struct ParameterLayoutTests {
+    func evaluateConstant(_ type: String, _ value: String, wrap: String = "") throws -> SIMD4<Float> {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let body = wrap.isEmpty
+            ? "<constant name=\"n\" type=\"\(type)\"><input name=\"value\" type=\"\(type)\" value=\"\(value)\" /></constant><output name=\"out\" type=\"\(type)\" nodename=\"n\" />"
+            : wrap
+        let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)</nodegraph></materialx>"
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "layout_test")
+        return try #require(try stitched.evaluate(at: [.zero]).first)
+    }
+
+    @Test(arguments: [("float", "0.5"), ("vector2", "1, 2"), ("vector3", "1, 2, 3"), ("color3", "0.1, 0.2, 0.3"), ("vector4", "1, 2, 3, 4"), ("color4", "0.1, 0.2, 0.3, 0.4"), ("integer", "7"), ("boolean", "true")])
+    func scalarAndVectorReadersMatchTheLayout(type: String, value: String) throws {
+        let valueType = ValueType(rawValue: type)
+        let numbers = try #require(try MaterialXValue(value, type: valueType).numbers)
+        let encoded = ParameterLayout.encode(numbers, as: valueType)
+        #expect(encoded.count == ParameterLayout.slotCount(for: valueType))
+        #expect(ParameterLayout.decode(encoded, as: valueType) == numbers)
+        let result = try evaluateConstant(type, value)
+        #expect(Array((0..<numbers.count).map { result[$0] }) == numbers)
+    }
+
+    /// Matrices: MaterialX value order is column by column, as GLSL's matN constructor fills them.
+    @Test func matrixReadersMatchTheLayout() throws {
+        let matrix33 = "1,2,3, 4,5,6, 7,8,10"
+        let numbers33 = try #require(try MaterialXValue(matrix33, type: .matrix33).numbers)
+        #expect(ParameterLayout.encode(numbers33, as: .matrix33).count == 3)
+        #expect(ParameterLayout.decode(ParameterLayout.encode(numbers33, as: .matrix33), as: .matrix33) == numbers33)
+        let result33 = try evaluateConstant("", "", wrap: """
+        <constant name="m" type="matrix33"><input name="value" type="matrix33" value="\(matrix33)" /></constant>
+        <transformmatrix name="n" type="vector3"><input name="in" type="vector3" value="1, 10, 100" /><input name="mat" type="matrix33" nodename="m" /></transformmatrix>
+        <output name="out" type="vector3" nodename="n" />
+        """)
+        // Columns (1,2,3), (4,5,6), (7,8,10): 1·c0 + 10·c1 + 100·c2.
+        #expect(result33.x == 741 && result33.y == 852 && result33.z == 1_063)
+
+        let matrix44 = "1,0,0,0, 0,1,0,0, 0,0,1,0, 5,6,7,1"
+        let numbers44 = try #require(try MaterialXValue(matrix44, type: .matrix44).numbers)
+        #expect(ParameterLayout.decode(ParameterLayout.encode(numbers44, as: .matrix44), as: .matrix44) == numbers44)
+        let result44 = try evaluateConstant("", "", wrap: """
+        <constant name="m" type="matrix44"><input name="value" type="matrix44" value="\(matrix44)" /></constant>
+        <transformmatrix name="n" type="vector4"><input name="in" type="vector4" value="1, 2, 3, 1" /><input name="mat" type="matrix44" nodename="m" /></transformmatrix>
+        <output name="out" type="vector4" nodename="n" />
+        """)
+        #expect(result44 == [6, 8, 10, 1]) // translated by the fourth column
+    }
+
+    @Test func everyLayoutTypeHasAReader() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let library = try MetalNodeLibrary(device: device)
+        for type in [ValueType.float, .vector2, .vector3, .color3, .vector4, .color4, .integer, .boolean, .matrix33, .matrix44] {
+            #expect(library.hasFunction(named: try ParameterLayout.readFunction(for: type)), "\(type)")
+        }
+        #expect(library.hasFunction(named: ParameterLayout.advanceFunction))
+    }
+}

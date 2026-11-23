@@ -1108,12 +1108,13 @@ Consequences:
 ## 59: Parameter buffer layout is spread over four places
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: area:architecture, effort:m
 created: 2026-11-23T13:37:47Z
-updated: 2026-11-23T13:38:12Z
+updated: 2026-11-23T14:07:22Z
+closed: 2026-11-23T14:07:22Z
 +++
 
 The layout of the constant-input buffer (one float4 slot per value, one per column for matrices, pointer advanced lazily between parameters) is encoded separately in:
@@ -1125,6 +1126,7 @@ The layout of the constant-input buffer (one float4 slot per value, one per colu
 All four must agree. Any layout change, such as the packing asked about in #24-Q1, has to edit all of them, and nothing checks that they stay consistent.
 
 - `2026-11-23T13:38:12Z`: Related: #24 (parameter packing question #24-Q1 would change all four places).
+- `2026-11-23T14:07:22Z`: New ParameterLayout (MaterialXMetal) owns the buffer layout: slotCount(for:), encode(_:as:), decode(_:as:), readFunction(for:), advanceFunction, isReadFunction. The Builder, StitchedGraph.set, constant folding and the mtlx CLI all use it instead of their own copies (Builder.slots removed). The Metal readers stay in StandardLibrary.metal; ParameterLayoutTests checks them against ParameterLayout for every type, including matrix column order via transformmatrix.
 
 ---
 

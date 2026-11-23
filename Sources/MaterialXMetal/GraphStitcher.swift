@@ -111,7 +111,7 @@ public struct StitchedGraph: @unchecked Sendable {
         guard let numbers = value.numbers, numbers.count == parameter.type.componentCount else {
             throw MaterialXError.invalidValue("\(value) for parameter '\(name)' of type \(parameter.type)")
         }
-        let slots = Builder.slots(for: parameter.type, numbers: numbers)
+        let slots = ParameterLayout.encode(numbers, as: parameter.type)
         parameterData.replaceSubrange(parameter.slot..<(parameter.slot + parameter.slotCount), with: slots)
     }
 
@@ -641,11 +641,11 @@ struct Builder {
     }
 
     mutating func parameter(name: String, type: ValueType, value: MaterialXValue?) throws -> GraphPlan.Operand {
-        let reader = try "mx_parameter_" + type.metalSuffix()
-        let slots = Self.slots(for: type, numbers: value?.numbers ?? [])
+        let reader = try ParameterLayout.readFunction(for: type)
+        let slots = ParameterLayout.encode(value?.numbers ?? [], as: type)
         // Advance lazily, past the previous parameter's slots, so the graph has no unused trailing node.
         for _ in 0..<previousSlotCount {
-            slotPointer = try call("mx_parameter_next", [slotPointer])
+            slotPointer = try call(ParameterLayout.advanceFunction, [slotPointer])
         }
         previousSlotCount = slots.count
         parameters.append(.init(name: name, type: type, slot: parameterData.count, slotCount: slots.count))
@@ -657,23 +657,6 @@ struct Builder {
             calls[index].valueType = type
         }
         return read
-    }
-
-    /// The float4 slots holding a value: one for scalars and vectors, one per column (3 or 4 floats) for matrices.
-    static func slots(for type: ValueType, numbers: [Float]) -> [SIMD4<Float>] {
-        let width = switch type {
-        case .matrix33: 3
-        case .matrix44: 4
-        default: 4
-        }
-        let count = type == .matrix33 ? 3 : type == .matrix44 ? 4 : 1
-        return (0..<count).map { column in
-            var slot = SIMD4<Float>.zero
-            for index in 0..<width where column * width + index < numbers.count {
-                slot[index] = numbers[column * width + index]
-            }
-            return slot
-        }
     }
 }
 
