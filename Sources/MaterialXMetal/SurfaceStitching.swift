@@ -173,10 +173,11 @@ public extension GraphStitcher {
         return GraphPlan(functionName: functionName, outputType: .surfaceshader, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)
     }
 
-    /// An unlit surface shader as a color4 graph for ``MaterialXUnlitSurface``: rgb = emission × emission color,
-    /// a = opacity. Supports `surface_unlit`; `transmission` is not drawn.
+    /// An unlit surface shader as a color4 graph for ``MaterialXUnlitSurface``. `surface_unlit`: rgb = emission ×
+    /// emission color, a = opacity (`transmission` is not drawn). `realitykit_unlit_surfaceshader`: rgb = color,
+    /// a = opacity.
     func planUnlit(_ shader: MaterialXNode, in document: MaterialXDocument, functionName: String) throws -> GraphPlan {
-        guard shader.category == "surface_unlit" else {
+        guard ["surface_unlit", "realitykit_unlit_surfaceshader"].contains(shader.category) else {
             throw MaterialXError.unsupportedNode("unlit surface <\(shader.category)>")
         }
         guard let nodeDef = standardLibrary.nodeDef(for: shader) else {
@@ -194,10 +195,14 @@ public extension GraphStitcher {
             }
             return try builder.resolve(input: shader.input(name), definition: definition, owner: shader.name, nodeColorSpace: shader.element["colorspace"] ?? document.colorSpace, in: scope)
         }
-        let emission = try input("emission")
-        let emissionColor = try input("emission_color")
         let opacity = try input("opacity")
-        let color = try builder.call("mx_multiply_color3FA", [emissionColor, emission])
+        let color: GraphPlan.Operand
+        if shader.category == "realitykit_unlit_surfaceshader" {
+            // RealityKit's unlit color is used as is; its tone-mapping and premultiplied-alpha flags are not applied.
+            color = try input("color")
+        } else {
+            color = try builder.call("mx_multiply_color3FA", [try input("emission_color"), try input("emission")])
+        }
         let rgba = try builder.call("mx_combine2_color4CF", [color, opacity])
         _ = try builder.call("mx_output_vector4", [rgba, .context, .parameters, .textures])
         return GraphPlan(functionName: functionName, outputType: .color4, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)

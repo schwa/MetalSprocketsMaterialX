@@ -1325,3 +1325,25 @@ struct TexcoordAndNormalMapTests {
         #expect(simd_distance(surface.normal, [0, 0, -1]) < 1e-6, "\(surface.normal)")
     }
 }
+
+/// #62: RealityKit's unlit surface draws through MaterialXUnlitSurface like surface_unlit.
+@Suite(.serialized, .enabled(if: FileManager.default.fileExists(atPath: StandardLibrary.appleShaderGraphURL.path), "Apple's ShaderGraph framework is not installed"))
+struct RealityKitUnlitTests {
+    @Test func realityKitUnlitBecomesAColor4Graph() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.38">
+          <realitykit_unlit_surfaceshader name="u" type="surfaceshader">
+            <input name="color" type="color3" value="0.2, 0.4, 0.6" />
+            <input name="opacity" type="float" value="0.5" />
+          </realitykit_unlit_surfaceshader>
+        </materialx>
+        """
+        let document = try MaterialXDocument(data: Data(xml.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: StandardLibrary.shared.addingAppleShaderGraphNodes())
+        let shader = try #require(document.nodes.first)
+        let graph = try stitcher.stitchUnlit(shader, in: document, functionName: "rk_unlit")
+        let value = try #require(try graph.evaluate(at: [.zero]).first)
+        #expect(simd_distance(value, [0.2, 0.4, 0.6, 0.5]) < 1e-6, "\(value)")
+    }
+}
