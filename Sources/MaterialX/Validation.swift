@@ -1,6 +1,6 @@
 import Foundation
 
-/// A problem found by ``Document/validate(library:)``.
+/// A problem found by ``MaterialXDocument/validate(library:)``.
 public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     /// Path of the element, such as `NG_wood/mix1.fg`.
     public var path: String
@@ -9,7 +9,7 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     public var description: String { "\(path): \(message)" }
 }
 
-public extension Document {
+public extension MaterialXDocument {
     /// Checks connections and types without compiling anything. An empty result means no problems were found.
     ///
     /// Reports dangling `nodename`, `nodegraph`, `output` and `interfacename` references, node categories with no
@@ -29,7 +29,7 @@ public extension Document {
         return issues.sorted { $0.path < $1.path }
     }
 
-    private func validate(nodes: [String: Node], graph: NodeGraph?, scope: String, library: StandardLibrary) -> [ValidationIssue] {
+    private func validate(nodes: [String: MaterialXNode], graph: NodeGraph?, scope: String, library: StandardLibrary) -> [ValidationIssue] {
         var issues: [ValidationIssue] = []
         for node in nodes.values {
             let nodePath = scope.isEmpty ? node.name : "\(scope)/\(node.name)"
@@ -73,7 +73,7 @@ public extension Document {
         return issues
     }
 
-    private func checkConnection(path: String, type: ValueType, upstream connection: (nodeName: String, output: String?), nodes: [String: Node], library: StandardLibrary) -> [ValidationIssue] {
+    private func checkConnection(path: String, type: ValueType, upstream connection: (nodeName: String, output: String?), nodes: [String: MaterialXNode], library: StandardLibrary) -> [ValidationIssue] {
         let (nodeName, output) = connection
         guard let upstream = nodes[nodeName] else {
             return [.init(path: path, message: "node '\(nodeName)' does not exist")]

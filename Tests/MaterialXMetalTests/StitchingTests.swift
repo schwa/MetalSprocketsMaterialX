@@ -37,7 +37,7 @@ struct StitchingTests {
 
     @Test func stitchedGraphMatchesExpectedValues() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.document.utf8))
+        let document = try MaterialXDocument(data: Data(Self.document.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let graph = try #require(document.nodeGraph("NG_test"))
         var stitched = try stitcher.stitch(graph, functionName: "materialx_graph")
@@ -63,7 +63,7 @@ struct StitchingTests {
           <output name="out" type="vector3" nodename="uv3" />
         </nodegraph></materialx>
         """
-        let document = try Document(data: Data(source.utf8))
+        let document = try MaterialXDocument(data: Data(source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
         #expect(try evaluate(stitched, device: device).map(\.x) == [0, 0.25, 0.5, 0.75])
@@ -71,7 +71,7 @@ struct StitchingTests {
 
     @Test func stitchedFunctionIsAMetalSprocketsVisibleFunction() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.document.utf8))
+        let document = try MaterialXDocument(data: Data(Self.document.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
         let function = try stitched.visibleFunction()
@@ -86,7 +86,7 @@ struct StitchingTests {
           <output name="out" type="float" nodename="n" />
         </nodegraph></materialx>
         """
-        let document = try Document(data: Data(source.utf8))
+        let document = try MaterialXDocument(data: Data(source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         #expect(throws: MaterialXError.self) {
             try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "f")

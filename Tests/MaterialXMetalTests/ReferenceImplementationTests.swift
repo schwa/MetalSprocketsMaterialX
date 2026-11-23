@@ -40,7 +40,7 @@ struct ReferenceImplementationTests {
     ]
 
     /// A fixed, safe input value: positive, away from zero, distinct per component and per input.
-    static func value(for input: Input, index: Int) -> (xml: String, metal: String)? {
+    static func value(for input: MaterialXInput, index: Int) -> (xml: String, metal: String)? {
         switch input.type {
         case .integer:
             return ("1", "1")
@@ -56,7 +56,7 @@ struct ReferenceImplementationTests {
 
     static func cases(nodeLibrary: MetalNodeLibrary) throws -> [Case] {
         let url = try #require(Bundle.module.url(forResource: "stdlib_genglsl_impl", withExtension: "mtlx"))
-        let implementations = try Document(url: url).root.children(tag: "implementation")
+        let implementations = try MaterialXDocument(url: url).root.children(tag: "implementation")
         let library = StandardLibrary.shared
         return implementations.compactMap { implementation in
             guard let name = implementation["nodedef"], let source = implementation["sourcecode"],
@@ -113,9 +113,9 @@ struct ReferenceImplementationTests {
           <output name="out" type="\(outputType)" nodename="n" />
         </nodegraph></materialx>
         """
-        let document: Document
+        let document: MaterialXDocument
         do {
-            document = try Document(data: Data(xml.utf8))
+            document = try MaterialXDocument(data: Data(xml.utf8))
         } catch {
             Issue.record("\(error): \(xml)")
             throw error

@@ -1,12 +1,12 @@
 import Foundation
 
-public extension Document {
+public extension MaterialXDocument {
     /// The filename an input refers to, with `[token]` substitutions and the nearest `fileprefix` applied.
     ///
     /// `fileprefix` is looked up on the input, then the node, then the graph, then the document root. Tokens come
     /// from `<token>` elements on the node, then the graph. `<UDIM>` and `<UVTILE>` are left in place; expand them
     /// per tile with ``FilenamePattern``.
-    func resolvedFilename(_ input: Input, node: Node, graph: NodeGraph? = nil) -> String? {
+    func resolvedFilename(_ input: MaterialXInput, node: MaterialXNode, graph: NodeGraph? = nil) -> String? {
         guard case let .string(value) = input.value else { return nil }
         let scopes = [input.element, node.element] + [graph?.element, root].compactMap(\.self)
         var tokens: [String: String] = [:]

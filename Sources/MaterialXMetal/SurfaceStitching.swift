@@ -92,7 +92,7 @@ public extension GraphStitcher {
     ///
     /// Connected inputs (nodegraph outputs or document-level nodes) are stitched; unconnected ones become parameters
     /// named `<shader>.<input>`, so they stay editable. Inputs with a `defaultgeomprop` read the shading context.
-    func planSurface(_ shader: Node, in document: Document, functionName: String, mapping: SurfaceMapping? = nil) throws -> GraphPlan {
+    func planSurface(_ shader: MaterialXNode, in document: MaterialXDocument, functionName: String, mapping: SurfaceMapping? = nil) throws -> GraphPlan {
         guard let mapping = mapping ?? SurfaceMapping.builtIn[shader.category] else {
             throw MaterialXError.unsupportedNode("surface shader <\(shader.category)> has no MXSurfaceInputs mapping")
         }
@@ -107,13 +107,13 @@ public extension GraphStitcher {
         // Translation nodes sit beside the document-level nodes: the first copies the shader's inputs, each later
         // one reads the previous one's `<input>_out` outputs.
         var translationNames: [String] = []
-        var extraNodes: [Element] = []
+        var extraNodes: [MaterialXElement] = []
         for (index, category) in mapping.translations.enumerated() {
             let name = "\(shader.name)#\(category)"
             guard let translationDef = standardLibrary.nodeDefs.values.first(where: { $0.node == category }) else {
                 throw MaterialXError.missingNodeDef(node: category)
             }
-            var inputs: [Element]
+            var inputs: [MaterialXElement]
             if index == 0 {
                 // Only the inputs the translation declares (geometry inputs are read straight from the shader).
                 inputs = shader.element.children(tag: "input").filter { input in
@@ -124,10 +124,10 @@ public extension GraphStitcher {
                 let previousOutputs = Set((standardLibrary.nodeDefs.values.first { $0.node == mapping.translations[index - 1] }?.outputs ?? []).map(\.name))
                 // Inputs the previous translation has no `<input>_out` for keep their defaults.
                 inputs = translationDef.inputs.filter { previousOutputs.contains($0.name + "_out") }.map { input in
-                    Element(tag: "input", attributes: ["name": input.name, "type": input.type.rawValue, "nodename": previous, "output": input.name + "_out"])
+                    MaterialXElement(tag: "input", attributes: ["name": input.name, "type": input.type.rawValue, "nodename": previous, "output": input.name + "_out"])
                 }
             }
-            extraNodes.append(Element(tag: category, attributes: ["name": name, "type": "multioutput"], children: inputs))
+            extraNodes.append(MaterialXElement(tag: category, attributes: ["name": name, "type": "multioutput"], children: inputs))
             translationNames.append(name)
         }
         let documentGraph = try Self.documentLevelGraph(document, output: shader.name, type: .surfaceshader, extraNodes: extraNodes)
@@ -149,7 +149,7 @@ public extension GraphStitcher {
         return GraphPlan(functionName: functionName, outputType: .surfaceshader, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)
     }
 
-    func stitchSurface(_ shader: Node, in document: Document, functionName: String, mapping: SurfaceMapping? = nil) throws -> StitchedGraph {
+    func stitchSurface(_ shader: MaterialXNode, in document: MaterialXDocument, functionName: String, mapping: SurfaceMapping? = nil) throws -> StitchedGraph {
         try stitch(planSurface(shader, in: document, functionName: functionName, mapping: mapping))
     }
 }

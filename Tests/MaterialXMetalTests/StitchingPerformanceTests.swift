@@ -111,7 +111,7 @@ struct StitchingPerformanceTests {
         var rows = ["nodes | stitch ms | link private ms | link binary+table ms | GPU private ms | GPU binary+table ms | GPU hand-written ms"]
         for count in [10, 50, 200] {
             let (xml, body) = Self.graph(count: count)
-            let document = try Document(data: Data(xml.utf8))
+            let document = try MaterialXDocument(data: Data(xml.utf8))
             let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
             let (stitched, stitchTime) = try milliseconds { try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph") }
 

@@ -17,12 +17,12 @@ struct DocumentOptions: ParsableArguments {
     @Argument(help: "A .mtlx file.", completion: .file(extensions: ["mtlx"]))
     var path: String
 
-    func load() throws -> Document {
-        try Document(url: URL(fileURLWithPath: path))
+    func load() throws -> MaterialXDocument {
+        try MaterialXDocument(url: URL(fileURLWithPath: path))
     }
 }
 
-func makeStitcher(for document: Document? = nil) throws -> GraphStitcher {
+func makeStitcher(for document: MaterialXDocument? = nil) throws -> GraphStitcher {
     guard let device = MTLCreateSystemDefaultDevice() else {
         throw ValidationError("No Metal device")
     }

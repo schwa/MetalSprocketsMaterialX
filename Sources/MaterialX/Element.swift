@@ -1,7 +1,7 @@
 import Foundation
 
-/// A generic MaterialX XML element. Typed views (``NodeDef``, ``Node``, ``NodeGraph``) read from it.
-public struct Element: Sendable, Hashable {
+/// A generic MaterialX XML element. Typed views (``NodeDef``, ``MaterialXNode``, ``NodeGraph``) read from it.
+public struct MaterialXElement: Sendable, Hashable {
     public var tag: String
     public var attributes: [String: String]
     public var children: [Self]
@@ -40,7 +40,7 @@ public enum MaterialXError: Error, Equatable, CustomStringConvertible {
         case let .parse(message): "MaterialX parse error: \(message)"
         case let .invalidDocument(message): "Invalid MaterialX document: \(message)"
         case let .missingNodeDef(node): "No nodedef matches node '\(node)'"
-        case let .unsupportedNode(name): "Node has no Metal implementation: \(name)"
+        case let .unsupportedNode(name): "MaterialXNode has no Metal implementation: \(name)"
         case let .invalidValue(value): "Invalid value: \(value)"
         case let .cycle(node): "Nodegraph cycle at '\(node)'"
         case let .stitchingFailed(message): "Function stitching failed: \(message)"
@@ -48,7 +48,7 @@ public enum MaterialXError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-extension Element {
+extension MaterialXElement {
     static func parse(_ data: Data) throws -> Self {
         let delegate = ParserDelegate()
         let parser = XMLParser(data: data)
@@ -61,11 +61,11 @@ extension Element {
 }
 
 private final class ParserDelegate: NSObject, XMLParserDelegate {
-    var stack: [Element] = []
-    var root: Element?
+    var stack: [MaterialXElement] = []
+    var root: MaterialXElement?
 
     func parser(_: XMLParser, didStartElement elementName: String, namespaceURI _: String?, qualifiedName _: String?, attributes: [String: String] = [:]) {
-        stack.append(Element(tag: elementName, attributes: attributes))
+        stack.append(MaterialXElement(tag: elementName, attributes: attributes))
     }
 
     func parser(_: XMLParser, didEndElement _: String, namespaceURI _: String?, qualifiedName _: String?) {

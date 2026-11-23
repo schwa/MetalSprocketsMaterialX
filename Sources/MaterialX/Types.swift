@@ -41,7 +41,7 @@ public struct ValueType: RawRepresentable, Hashable, Sendable, CustomStringConve
 }
 
 /// A parsed MaterialX value. Float vectors, colors and matrices are stored as floats.
-public enum Value: Hashable, Sendable {
+public enum MaterialXValue: Hashable, Sendable {
     case numbers([Float])
     case integer(Int)
     case boolean(Bool)
@@ -106,7 +106,7 @@ public struct TypeDef: Hashable, Sendable {
     public var context: String?
     public var members: [Member]
 
-    public init(_ element: Element) throws {
+    public init(_ element: MaterialXElement) throws {
         guard let name = element.name else {
             throw MaterialXError.invalidDocument("<typedef> without name")
         }

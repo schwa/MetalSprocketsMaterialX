@@ -22,7 +22,7 @@ struct CorpusTests {
 
     @Test(arguments: files)
     func documentParsesAndValidates(url: URL) throws {
-        let document = try Document(url: url)
+        let document = try MaterialXDocument(url: url)
         #expect(!document.materials.isEmpty || !document.nodeGraphs.isEmpty)
         let issues = document.validate()
         #expect(issues.isEmpty, "\(issues)")
@@ -36,7 +36,7 @@ struct CorpusTests {
         var unsupported: [String: Int] = [:]
         var errors: [String] = []
         for url in Self.files {
-            let document = try Document(url: url)
+            let document = try MaterialXDocument(url: url)
             let stitcher = GraphStitcher(nodeLibrary: nodeLibrary, standardLibrary: StandardLibrary.shared.merging([document]))
             let shaders = document.nodes.filter { $0.type == .surfaceshader }
             for shader in shaders {

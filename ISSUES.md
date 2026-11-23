@@ -169,12 +169,13 @@ Documents are trusted as given. There is no check for dangling nodename referenc
 ## 10: Swift API surface of the MaterialX module needs a design pass
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:m, area:document, area:api
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T14:04:26Z
+closed: 2026-11-23T14:04:26Z
 +++
 
 Types are named Element, Node, Input, Output, Value, Document in module MaterialX. They clash easily with other modules imported by SceneSprockets and MetalSprockets (e.g. Node in SceneSprockets). Naming, Sendable, Codable and mutability were picked quickly during bootstrap.
@@ -183,6 +184,7 @@ Types are named Element, Node, Input, Output, Value, Document in module Material
 - `2026-11-23T13:39:37Z`: I'd rather not :-(
 - `2026-11-23T13:39:45Z`: Answer 1: I'd rather not :-(
 - `2026-11-23T13:56:21Z`: Confirmed in practice: MaterialX.Element collides with MetalSprockets.Element. MaterialXUnlitSurface (#41) has to spell out MetalSprockets.Element.
+- `2026-11-23T14:04:26Z`: Per #10-Q1: Element, Node, Input, Output, Value and Document are now MaterialXElement, MaterialXNode, MaterialXInput, MaterialXOutput, MaterialXValue and MaterialXDocument; NodeDef, NodeGraph, TypeDef keep their names. Mechanical rename with sed (BSD word boundaries) across Sources and Tests, then hand-fixed comment prose the regex caught. The clash with MetalSprockets.Element is gone, so MaterialXUnlitSurface uses plain Element again. README updated. Breaking change; all 75 tests pass.
 
 ---
 

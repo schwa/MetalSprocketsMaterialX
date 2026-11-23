@@ -10,9 +10,7 @@ import MetalSprockets
 /// coordinate (float2), matching ``vertexDescriptor``. Parameters are read from the graph on every frame, so editing
 /// ``StitchedGraph/parameterData`` needs no rebuild. Re-stitching a graph whose wiring did not change reuses the
 /// cached library, so the pipeline is reused too.
-///
-/// `MetalSprockets.Element` is spelled out because the MaterialX module also has an `Element` (#10).
-public struct MaterialXUnlitSurface<Content>: MetalSprockets.Element where Content: MetalSprockets.Element {
+public struct MaterialXUnlitSurface<Content>: Element where Content: Element {
     let graph: StitchedGraph
     let uniforms: MXUnlitUniforms
     let textures: [(texture: MTLTexture, sampler: MTLSamplerState)?]
@@ -43,7 +41,7 @@ public struct MaterialXUnlitSurface<Content>: MetalSprockets.Element where Conte
         return descriptor
     }
 
-    public var body: some MetalSprockets.Element {
+    public var body: some Element {
         get throws {
             let device = graph.library.device
             let shaders = try device.makeDefaultLibrary(bundle: .materialXMetalShaders())

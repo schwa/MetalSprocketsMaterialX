@@ -38,7 +38,7 @@ public struct GeometryCollection: Hashable, Sendable {
     public var excludeGeometry: String
     public var includeCollections: [String]
 
-    init(_ element: Element) {
+    init(_ element: MaterialXElement) {
         name = element.name ?? ""
         includeGeometry = element["includegeom"] ?? ""
         excludeGeometry = element["excludegeom"] ?? ""
@@ -53,7 +53,7 @@ public struct MaterialAssign: Hashable, Sendable {
     public var collection: String?
     public var exclusive: Bool
 
-    init(_ element: Element) {
+    init(_ element: MaterialXElement) {
         name = element.name ?? ""
         material = element["material"] ?? ""
         geometry = element["geom"] ?? ""
@@ -75,7 +75,7 @@ public struct Look: Hashable, Sendable {
     public var materialAssigns: [MaterialAssign]
     public var variantAssigns: [VariantAssign]
 
-    init(_ element: Element) {
+    init(_ element: MaterialXElement) {
         name = element.name ?? ""
         inherit = element["inherit"]
         materialAssigns = element.children(tag: "materialassign").map(MaterialAssign.init)
@@ -89,13 +89,13 @@ public struct Look: Hashable, Sendable {
 public struct VariantSet: Hashable, Sendable {
     public var name: String
     /// Variant name → its `<input>` elements.
-    public var variants: [String: [Input]]
+    public var variants: [String: [MaterialXInput]]
 
-    init(_ element: Element) throws {
+    init(_ element: MaterialXElement) throws {
         name = element.name ?? ""
-        var variants: [String: [Input]] = [:]
+        var variants: [String: [MaterialXInput]] = [:]
         for variant in element.children(tag: "variant") {
-            variants[variant.name ?? ""] = try variant.children(tag: "input").map(Input.init)
+            variants[variant.name ?? ""] = try variant.children(tag: "input").map(MaterialXInput.init)
         }
         self.variants = variants
     }
@@ -106,16 +106,16 @@ public struct PropertyGroup: Hashable, Sendable {
     public var name: String
     public var geometry: String?
     /// Child elements (`geomprop`, `token`, `property`) by name.
-    public var values: [String: Element]
+    public var values: [String: MaterialXElement]
 
-    init(_ element: Element) {
+    init(_ element: MaterialXElement) {
         name = element.name ?? ""
         geometry = element["geom"]
         values = Dictionary(element.children.compactMap { child in child.name.map { ($0, child) } }) { first, _ in first }
     }
 }
 
-public extension Document {
+public extension MaterialXDocument {
     var looks: [Look] { root.children(tag: "look").map(Look.init) }
     var collections: [GeometryCollection] { root.children(tag: "collection").map(GeometryCollection.init) }
     var geomInfos: [PropertyGroup] { root.children(tag: "geominfo").map(PropertyGroup.init) }

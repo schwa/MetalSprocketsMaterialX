@@ -1,6 +1,6 @@
 import Foundation
 
-public extension Element {
+public extension MaterialXElement {
     /// XML for this element and its children, indented by two spaces per level.
     ///
     /// Attributes are written `name`, `type`, `nodedef`, then the rest sorted, because the parser does not keep their
@@ -26,7 +26,7 @@ public extension Element {
     }
 }
 
-public extension Document {
+public extension MaterialXDocument {
     /// The document as `.mtlx` XML. `xi:include`s were expanded on load, so included content is written inline.
     func data() -> Data {
         Data(("<?xml version=\"1.0\"?>\n" + root.xmlString()).utf8)

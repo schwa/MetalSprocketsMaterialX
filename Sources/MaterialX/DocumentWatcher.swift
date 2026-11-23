@@ -6,7 +6,7 @@ import Foundation
 /// are reported and skipped; the next good save is yielded.
 public struct DocumentWatcher: Sendable {
     public enum Event: Sendable {
-        case loaded(Document)
+        case loaded(MaterialXDocument)
         case failed(String)
     }
 
@@ -30,7 +30,7 @@ public struct DocumentWatcher: Sendable {
                     if current != stamps {
                         stamps = current
                         do {
-                            continuation.yield(.loaded(try Document(url: url)))
+                            continuation.yield(.loaded(try MaterialXDocument(url: url)))
                         } catch {
                             continuation.yield(.failed("\(error)"))
                         }
@@ -50,7 +50,7 @@ public struct DocumentWatcher: Sendable {
         while let next = pending.popLast() {
             guard stamps[next] == nil else { continue }
             stamps[next] = (try? FileManager.default.attributesOfItem(atPath: next.path)[.modificationDate] as? Date) ?? .distantPast
-            if let data = try? Data(contentsOf: next), let root = try? Element.parse(data) {
+            if let data = try? Data(contentsOf: next), let root = try? MaterialXElement.parse(data) {
                 for include in root.children(tag: "xi:include") {
                     if let href = include["href"] {
                         pending.append(URL(fileURLWithPath: href, relativeTo: next.deletingLastPathComponent()).standardizedFileURL)

@@ -60,7 +60,7 @@ struct UnlitSurfaceTests {
     @Test func drawsTheGraphColorAndFollowsParameterEdits() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        var graph = try stitcher.stitch(try #require(Document(data: Data(Self.source.utf8)).nodeGraph("g")), functionName: "materialx_unlit_test")
+        var graph = try stitcher.stitch(try #require(MaterialXDocument(data: Data(Self.source.utf8)).nodeGraph("g")), functionName: "materialx_unlit_test")
         let image = try render(graph)
         // u < 0.5 on the left: blue; right: tint (red).
         #expect(try pixel(image, x: 1, y: 4) == [0, 0, 255, 255])

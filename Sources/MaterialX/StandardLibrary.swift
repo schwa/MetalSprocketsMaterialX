@@ -7,7 +7,7 @@ public struct StandardLibrary: Sendable {
     /// Unit scales by unit type and unit name, from `<unitdef>`: `units["distance"]["inch"] == 0.0254`.
     public var units: [String: [String: Float]]
     /// `<geompropdef>`s by name, such as `UV0` or `Nworld`, used by inputs with a `defaultgeomprop`.
-    public var geomPropDefs: [String: Element]
+    public var geomPropDefs: [String: MaterialXElement]
     /// Functional nodegraphs (`*_ng.mtlx`) keyed by the nodedef they implement.
     public var nodeGraphs: [String: NodeGraph]
     private var nodeDefsByCategory: [String: [NodeDef]]
@@ -28,25 +28,25 @@ public struct StandardLibrary: Sendable {
     }()
 
     /// The documents the library was built from, in load order.
-    public private(set) var documents: [Document]
+    public private(set) var documents: [MaterialXDocument]
 
     public init(librariesURL: URL) throws {
-        var documents: [Document] = []
+        var documents: [MaterialXDocument] = []
         let enumerator = FileManager.default.enumerator(at: librariesURL, includingPropertiesForKeys: nil)
         while let url = enumerator?.nextObject() as? URL {
             guard url.pathExtension == "mtlx" else { continue }
-            documents.append(try Document(url: url))
+            documents.append(try MaterialXDocument(url: url))
         }
         self.init(documents: documents)
     }
 
     /// A library of the nodedefs and functional nodegraphs in `documents`. Later documents override earlier ones.
-    public init(documents: [Document]) {
+    public init(documents: [MaterialXDocument]) {
         self.documents = documents
         var nodeDefs: [String: NodeDef] = [:]
         var typeDefs: [ValueType: TypeDef] = [:]
         var units: [String: [String: Float]] = [:]
-        var geomPropDefs: [String: Element] = [:]
+        var geomPropDefs: [String: MaterialXElement] = [:]
         var nodeGraphs: [String: NodeGraph] = [:]
         var graphsByName: [String: NodeGraph] = [:]
         var implementations: [(nodeDef: String, nodeGraph: String)] = []
@@ -94,12 +94,12 @@ public struct StandardLibrary: Sendable {
     }
 
     /// The interface input `name` of `graph`: its own `<input>`, or for a functional nodegraph, its nodedef's input.
-    public func interfaceInput(_ name: String, of graph: NodeGraph) -> Input? {
+    public func interfaceInput(_ name: String, of graph: NodeGraph) -> MaterialXInput? {
         graph.input(name) ?? graph.nodeDefName.flatMap { nodeDefs[$0]?.input(name) }
     }
 
     /// This library plus the custom nodedefs and nodegraph implementations declared in `documents`.
-    public func merging(_ documents: [Document]) -> Self {
+    public func merging(_ documents: [MaterialXDocument]) -> Self {
         Self(documents: self.documents + documents)
     }
 
@@ -112,7 +112,7 @@ public struct StandardLibrary: Sendable {
     }
 
     /// The nodedef for `node`: its explicit `nodedef`, else the one whose output type and input types match.
-    public func nodeDef(for node: Node, resolveType: (Input) -> ValueType = \.type) -> NodeDef? {
+    public func nodeDef(for node: MaterialXNode, resolveType: (MaterialXInput) -> ValueType = \.type) -> NodeDef? {
         if let name = node.nodeDefName {
             return nodeDefs[name]
         }

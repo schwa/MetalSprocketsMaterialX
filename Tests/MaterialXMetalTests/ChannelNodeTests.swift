@@ -27,7 +27,7 @@ struct ChannelNodeTests {
     func evaluate(_ body: String, type: String) throws -> SIMD4<Float> {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
-        let document = try Document(data: Data(xml.utf8))
+        let document = try MaterialXDocument(data: Data(xml.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
         return try StitchingTests().evaluate(stitched, device: device)[0]
@@ -93,7 +93,7 @@ struct ShaderInputStitchingTests {
 
     @Test func stitchesShaderInputs() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let shader = try #require(document.nodes.first { $0.name == "shader" })
 
@@ -146,7 +146,7 @@ struct FunctionalNodeGraphTests {
 
     @Test func customNodeDefIsInlinedTwice() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: StandardLibrary.shared.merging([document]))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
         // ((0.1, 0.2, 0.3) * 2 + 0.5) * 1 + 0.5
@@ -194,7 +194,7 @@ struct MultiOutputTests {
 
     func stitch(output: String) throws -> (StitchedGraph, MTLDevice) {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: StandardLibrary.shared.merging([document]))
         return (try stitcher.stitch(try #require(document.nodeGraph("g")), output: output, functionName: "materialx_graph"), device)
     }
@@ -223,7 +223,7 @@ struct TexcoordIndexTests {
           <output name="out" type="vector2" nodename="n" />
         </nodegraph></materialx>
         """
-        let document = try Document(data: Data(source.utf8))
+        let document = try MaterialXDocument(data: Data(source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
         var context = MXShadingContext(texcoord: [0.1, 0.2])
@@ -253,14 +253,14 @@ struct StitchCacheTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let nodeLibrary = try MetalNodeLibrary(device: device)
         let stitcher = GraphStitcher(nodeLibrary: nodeLibrary)
-        let red = try stitcher.stitch(try #require(Document(data: Data(graph("0.5, 0, 0").utf8)).nodeGraph("g")), functionName: "materialx_graph")
-        let blue = try stitcher.stitch(try #require(Document(data: Data(graph("0, 0, 0.25").utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let red = try stitcher.stitch(try #require(MaterialXDocument(data: Data(graph("0.5, 0, 0").utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let blue = try stitcher.stitch(try #require(MaterialXDocument(data: Data(graph("0, 0, 0.25").utf8)).nodeGraph("g")), functionName: "materialx_graph")
         #expect(red.library === blue.library)
         #expect(nodeLibrary.stitchCount == 1)
         #expect(try StitchingTests().evaluate(red, device: device)[0] == [1, 0, 0, 1])
         #expect(try StitchingTests().evaluate(blue, device: device)[0] == [0, 0, 0.5, 1])
 
-        let renamed = try stitcher.stitch(try #require(Document(data: Data(graph("0, 0, 0.25").utf8)).nodeGraph("g")), functionName: "other_name")
+        let renamed = try stitcher.stitch(try #require(MaterialXDocument(data: Data(graph("0, 0, 0.25").utf8)).nodeGraph("g")), functionName: "other_name")
         #expect(renamed.library !== red.library)
         #expect(nodeLibrary.stitchCount == 2)
     }
@@ -285,7 +285,7 @@ struct ConditionalNodeTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
         return try StitchingTests().evaluate(stitched, device: device)[0]
     }
 
@@ -324,7 +324,7 @@ struct ColorManagementTests {
         </nodegraph></materialx>
         """
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
         return try StitchingTests().evaluate(stitched, device: device)[0]
     }
 
@@ -351,7 +351,7 @@ struct ColorManagementTests {
 struct ColorSpaceAndUnitTests {
     func evaluate(_ xml: String, configure: (inout GraphStitcher) -> Void = { _ in }) throws -> SIMD4<Float> {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(xml.utf8))
+        let document = try MaterialXDocument(data: Data(xml.utf8))
         var stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         configure(&stitcher)
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph", documentColorSpace: document.colorSpace)
@@ -413,7 +413,7 @@ struct DeepGraphTests {
         }
         let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(nodes)<output name=\"out\" type=\"float\" nodename=\"n\(count)\" /></nodegraph></materialx>"
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
         #expect(try StitchingTests().evaluate(stitched, device: device)[0].x == Float(count))
     }
 
@@ -427,7 +427,7 @@ struct DeepGraphTests {
         </nodegraph></materialx>
         """
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let graph = try #require(try Document(data: Data(xml.utf8)).nodeGraph("g"))
+        let graph = try #require(try MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g"))
         #expect {
             try stitcher.stitch(graph, functionName: "materialx_graph")
         } throws: { error in
@@ -441,17 +441,17 @@ struct DeepGraphTests {
 struct ParameterSetterTests {
     @Test func setByNameWithTypeChecks() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(StitchingTests.document.utf8))
+        let document = try MaterialXDocument(data: Data(StitchingTests.document.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         var stitched = try stitcher.stitch(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
 
-        try stitched.set("tint", to: Value.numbers([1, 1, 1]))
+        try stitched.set("tint", to: MaterialXValue.numbers([1, 1, 1]))
         try stitched.set("blend.mix", to: 1)
         #expect(try StitchingTests().evaluate(stitched, device: device)[0] == [2, 2, 2, 1])
 
         #expect(throws: MaterialXError.self) { try stitched.set("tint", to: 0.5) }
         #expect(throws: MaterialXError.self) { try stitched.set("missing", to: 1) }
-        #expect(throws: MaterialXError.self) { try stitched.set("tint", to: Value.numbers([1, 1])) }
+        #expect(throws: MaterialXError.self) { try stitched.set("tint", to: MaterialXValue.numbers([1, 1])) }
     }
 }
 
@@ -460,7 +460,7 @@ struct ParameterSetterTests {
 struct GraphDescriptionTests {
     @Test func descriptionNamesFunctionsAndNodes() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(StitchingTests.document.utf8))
+        let document = try MaterialXDocument(data: Data(StitchingTests.document.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
         let description = stitched.graphDescription
@@ -477,10 +477,10 @@ struct CarryParametersTests {
     @Test func editedValuesCarryOver() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        var old = try stitcher.stitch(try #require(Document(data: Data(StitchingTests.document.utf8)).nodeGraph("NG_test")), functionName: "materialx_graph")
+        var old = try stitcher.stitch(try #require(MaterialXDocument(data: Data(StitchingTests.document.utf8)).nodeGraph("NG_test")), functionName: "materialx_graph")
         try old.set("tint", to: SIMD3<Float>(0.1, 0.2, 0.3))
         let changed = StitchingTests.document.replacingOccurrences(of: "<input name=\"mix\" type=\"float\" value=\"0.5\" />", with: "<input name=\"mix\" type=\"float\" value=\"0.25\" />")
-        var new = try stitcher.stitch(try #require(Document(data: Data(changed.utf8)).nodeGraph("NG_test")), functionName: "materialx_graph")
+        var new = try stitcher.stitch(try #require(MaterialXDocument(data: Data(changed.utf8)).nodeGraph("NG_test")), functionName: "materialx_graph")
         new.carryParameters(from: old)
         #expect(new.parameterData[try #require(new.parameter("tint")).slot] == [0.1, 0.2, 0.3, 0])
         // mix was edited in the file, not at run time, so the file's new value wins.
@@ -495,7 +495,7 @@ struct GraphPlanTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let nodeLibrary = try MetalNodeLibrary(device: device)
         let stitcher = GraphStitcher(nodeLibrary: nodeLibrary)
-        let document = try Document(data: Data(StitchingTests.document.utf8))
+        let document = try MaterialXDocument(data: Data(StitchingTests.document.utf8))
         let plan = try stitcher.plan(try #require(document.nodeGraph("NG_test")), functionName: "materialx_graph")
         #expect(nodeLibrary.stitchCount == 0)
         #expect(plan.parameters.map(\.name) == ["tint", "scaled.in2", "blend.bg", "blend.mix"])
@@ -518,7 +518,7 @@ struct GraphPlanTests {
           <output name="out" type="color3" nodename="n" />
         </nodegraph></materialx>
         """
-        let document = try Document(data: Data(xml.utf8))
+        let document = try MaterialXDocument(data: Data(xml.utf8))
         let plan = try stitcher.plan(try #require(document.nodeGraph("g")), functionName: "f", documentColorSpace: document.colorSpace)
         #expect(plan.calls.contains { ($0.origin ?? "").hasPrefix("n.in1#colorspace/") })
     }
@@ -538,7 +538,7 @@ struct EvaluateTests {
         </nodegraph></materialx>
         """
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
         let values = try stitched.evaluate(at: [[0.25, 0], [0.75, 0], [0.9, 0]])
         #expect(values.map(\.x) == [0, 1, 1])
         #expect(try stitched.evaluate(at: []).isEmpty)
@@ -557,7 +557,7 @@ struct ShadingContextTests {
         </nodegraph></materialx>
         """
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
         var context = MXShadingContext(texcoord: [0.25, 0.75])
         context.time = 99
         context.vertexColor = [9, 9, 9, 9] // Fields after texcoord must not shift it.
@@ -569,7 +569,7 @@ struct ShadingContextTests {
     @Test func signatureIsContextThenParameters() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let plan = try stitcher.plan(try #require(Document(data: Data(StitchingTests.document.utf8)).nodeGraph("NG_test")), functionName: "f")
+        let plan = try stitcher.plan(try #require(MaterialXDocument(data: Data(StitchingTests.document.utf8)).nodeGraph("NG_test")), functionName: "f")
         #expect(plan.description.hasPrefix("f(arg0: context, arg1: parameters, arg2: textures):"))
         #expect(StitchedGraph.Argument.context.rawValue == 0)
     }
@@ -582,7 +582,7 @@ struct GeometryNodeTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let stitched = try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
         return try #require(try stitched.evaluate(contexts: [context]).first)
     }
 
@@ -655,7 +655,7 @@ struct TextureTableTests {
 
     @Test func graphSamplesTheTextureInItsSlot() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device), standardLibrary: StandardLibrary.shared.merging([document]))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph")
         #expect(stitched.graphDescription.contains("mx_texture_slot_color4(arg2,"))
@@ -706,7 +706,7 @@ struct ImageNodeTests {
 
     @Test func imagesBindSlotsAndSample() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let stitched = try stitcher.stitch(try #require(document.nodeGraph("g")), functionName: "materialx_graph", documentFilePrefix: document.root["fileprefix"])
 
@@ -742,7 +742,7 @@ struct DocumentLevelMultiOutputTests {
           <standard_surface name="s" type="surfaceshader"><input name="base" type="float" nodename="parts" output="outg" /></standard_surface>
         </materialx>
         """
-        let document = try Document(data: Data(xml.utf8))
+        let document = try MaterialXDocument(data: Data(xml.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let input = try #require(document.nodes.first { $0.name == "s" }?.input("base"))
         let stitched = try stitcher.stitch(input, in: document, functionName: "materialx_graph")
@@ -773,7 +773,7 @@ struct SurfaceStitchingTests {
 
     @Test func gltfPbrFillsSurfaceInputs() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let shader = try #require(document.nodes.first { $0.name == "pbr" })
         var material = try stitcher.stitchSurface(shader, in: document, functionName: "materialx_surface")
@@ -796,7 +796,7 @@ struct SurfaceStitchingTests {
 
     @Test func unmappedShaderThrows() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data("<materialx version=\"1.39\"><surface_unlit name=\"s\" type=\"surfaceshader\" /></materialx>".utf8))
+        let document = try MaterialXDocument(data: Data("<materialx version=\"1.39\"><surface_unlit name=\"s\" type=\"surfaceshader\" /></materialx>".utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let shader = try #require(document.nodes.first)
         #expect(throws: MaterialXError.self) { try stitcher.stitchSurface(shader, in: document, functionName: "f") }
@@ -808,7 +808,7 @@ struct SurfaceStitchingTests {
 struct SurfaceTranslationTests {
     func surface(_ xml: String, shader: String) throws -> MXSurfaceInputs {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let document = try Document(data: Data(xml.utf8))
+        let document = try MaterialXDocument(data: Data(xml.utf8))
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
         let node = try #require(document.nodes.first { $0.name == shader })
         let material = try stitcher.stitchSurface(node, in: document, functionName: "materialx_surface")
@@ -878,7 +878,7 @@ struct SurfaceTranslationTests {
         var stitched = 0
         var errors: [String] = []
         for url in CorpusTests.files {
-            let document = try Document(url: url)
+            let document = try MaterialXDocument(url: url)
             let stitcher = GraphStitcher(nodeLibrary: nodeLibrary, standardLibrary: StandardLibrary.shared.merging([document]))
             for shader in document.nodes where shader.type == .surfaceshader && SurfaceMapping.builtIn[shader.category] != nil {
                 do {

@@ -61,7 +61,7 @@ public extension StitchedGraph {
 
     /// Dispatches `kernel` (one of the `mx_evaluate_*` kernels) with this graph in its function table. `initial` is
     /// the output buffer's starting contents, one element per context.
-    private func run<Output>(kernel kernelName: String, contexts: [MXShadingContext], initial: [Output], textures: (table: MTLBuffer?, resident: [MTLTexture]), device: MTLDevice?) throws -> [Output] {
+    private func run<Result>(kernel kernelName: String, contexts: [MXShadingContext], initial: [Result], textures: (table: MTLBuffer?, resident: [MTLTexture]), device: MTLDevice?) throws -> [Result] {
         guard !contexts.isEmpty else { return [] }
         let device = device ?? library.device
         let shaders = try device.makeDefaultLibrary(bundle: .materialXMetalShaders())
@@ -87,7 +87,7 @@ public extension StitchedGraph {
               let handle = pipeline.functionHandle(function: binary),
               let input = device.makeBuffer(bytes: contexts, length: MemoryLayout<MXShadingContext>.stride * contexts.count),
               let parameterBuffer = device.makeBuffer(bytes: parameters, length: MemoryLayout<SIMD4<Float>>.stride * parameters.count),
-              let output = device.makeBuffer(bytes: initial, length: MemoryLayout<Output>.stride * contexts.count),
+              let output = device.makeBuffer(bytes: initial, length: MemoryLayout<Result>.stride * contexts.count),
               let queue = device.makeCommandQueue(),
               let commandBuffer = queue.makeCommandBuffer(),
               let encoder = commandBuffer.makeComputeCommandEncoder()
@@ -113,7 +113,7 @@ public extension StitchedGraph {
         if let error = commandBuffer.error {
             throw error
         }
-        let pointer = output.contents().bindMemory(to: Output.self, capacity: contexts.count)
+        let pointer = output.contents().bindMemory(to: Result.self, capacity: contexts.count)
         return Array(UnsafeBufferPointer(start: pointer, count: contexts.count))
     }
 

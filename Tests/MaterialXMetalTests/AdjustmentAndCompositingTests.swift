@@ -9,7 +9,7 @@ struct AdjustmentAndCompositingTests {
     func stitch(_ body: String, type: String, device: MTLDevice) throws -> StitchedGraph {
         let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(body)<output name=\"out\" type=\"\(type)\" nodename=\"n\" /></nodegraph></materialx>"
         let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
-        return try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        return try stitcher.stitch(try #require(MaterialXDocument(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
     }
 
     @Test func everyNonShaderNodeDefStitches() throws {

@@ -33,18 +33,18 @@ struct DocumentTests {
         try write("main.mtlx", "<xi:include href=\"sub/defs.mtlx\" /><nodegraph name=\"main_graph\" />")
         try write("sub/defs.mtlx", "<xi:include href=\"more.mtlx\" /><nodedef name=\"ND_a\" node=\"a\"><output name=\"out\" type=\"float\" /></nodedef>")
         try write("sub/more.mtlx", "<nodegraph name=\"included_graph\" />")
-        let document = try Document(url: directory.appendingPathComponent("main.mtlx"))
+        let document = try MaterialXDocument(url: directory.appendingPathComponent("main.mtlx"))
         #expect(document.nodeDefs.map(\.name) == ["ND_a"])
         #expect(Set(document.nodeGraphs.map(\.name)) == ["main_graph", "included_graph"])
 
         try write("loop.mtlx", "<xi:include href=\"loop.mtlx\" />")
-        #expect(throws: MaterialXError.self) { try Document(url: directory.appendingPathComponent("loop.mtlx")) }
+        #expect(throws: MaterialXError.self) { try MaterialXDocument(url: directory.appendingPathComponent("loop.mtlx")) }
     }
 
     /// #3: a node's version attribute picks the matching nodedef; without one the default version wins.
     @Test func nodeDefVersionSelection() throws {
-        func node(_ attributes: [String: String]) throws -> Node {
-            try Node(Element(tag: "standard_surface", attributes: ["name": "s", "type": "surfaceshader"].merging(attributes) { $1 }))
+        func node(_ attributes: [String: String]) throws -> MaterialXNode {
+            try MaterialXNode(MaterialXElement(tag: "standard_surface", attributes: ["name": "s", "type": "surfaceshader"].merging(attributes) { $1 }))
         }
         let library = StandardLibrary.shared
         #expect(library.nodeDef(for: try node([:]))?.name == "ND_standard_surface_surfaceshader")
@@ -68,7 +68,7 @@ struct DocumentTests {
           <image name="c" type="color3"><input name="file" type="filename" value="top.png" /></image>
         </materialx>
         """
-        let document = try Document(data: Data(source.utf8))
+        let document = try MaterialXDocument(data: Data(source.utf8))
         let graph = try #require(document.nodeGraph("g"))
         func resolve(_ name: String, in graph: NodeGraph?) throws -> String? {
             let node = try #require(graph?.nodes[name] ?? document.nodes.first { $0.name == name })
@@ -104,7 +104,7 @@ struct DocumentTests {
           </standard_surface>
         </materialx>
         """
-        let issues = try Document(data: Data(source.utf8)).validate().map(\.description)
+        let issues = try MaterialXDocument(data: Data(source.utf8)).validate().map(\.description)
         #expect(issues.contains { $0.hasPrefix("g/bad_type.in1: type color3 does not match 'f'") })
         #expect(issues.contains { $0.hasPrefix("g/bad_type.in2: interface input 'missing'") })
         #expect(issues.contains { $0.hasPrefix("g/dangling.in1: node 'nowhere'") })
@@ -125,26 +125,26 @@ struct DocumentTests {
           <surfacematerial name="mat" type="material"><input name="surfaceshader" type="surfaceshader" nodename="s" /></surfacematerial>
         </materialx>
         """
-        #expect(try Document(data: Data(source.utf8)).validate().isEmpty)
+        #expect(try MaterialXDocument(data: Data(source.utf8)).validate().isEmpty)
     }
 
     @Test func nodeDefMatchesFloatArgumentVariant() throws {
-        let node = try Node(Element(tag: "multiply", attributes: ["name": "m", "type": "color3"], children: [
-            Element(tag: "input", attributes: ["name": "in1", "type": "color3", "value": "1, 1, 1"]),
-            Element(tag: "input", attributes: ["name": "in2", "type": "float", "value": "0.5"]),
+        let node = try MaterialXNode(MaterialXElement(tag: "multiply", attributes: ["name": "m", "type": "color3"], children: [
+            MaterialXElement(tag: "input", attributes: ["name": "in1", "type": "color3", "value": "1, 1, 1"]),
+            MaterialXElement(tag: "input", attributes: ["name": "in2", "type": "float", "value": "0.5"]),
         ]))
         #expect(StandardLibrary.shared.nodeDef(for: node)?.name == "ND_multiply_color3FA")
     }
 
     @Test func parsesValues() throws {
-        #expect(try Value("0.1, 0.2, 0.3", type: .color3) == .numbers([0.1, 0.2, 0.3]))
-        #expect(try Value("true", type: .boolean) == .boolean(true))
-        #expect(try Value("true", type: .boolean).numbers == [1])
-        #expect(try Value(" 3 ", type: .integer) == .integer(3))
-        #expect(try Value("1 1,1", type: .color3) == .numbers([1, 1, 1]))
-        #expect(throws: MaterialXError.self) { try Value("1, 2", type: .color3) }
-        #expect(throws: MaterialXError.self) { try Value("1.5", type: .integer) }
-        #expect(throws: MaterialXError.self) { try Value("yes", type: .boolean) }
+        #expect(try MaterialXValue("0.1, 0.2, 0.3", type: .color3) == .numbers([0.1, 0.2, 0.3]))
+        #expect(try MaterialXValue("true", type: .boolean) == .boolean(true))
+        #expect(try MaterialXValue("true", type: .boolean).numbers == [1])
+        #expect(try MaterialXValue(" 3 ", type: .integer) == .integer(3))
+        #expect(try MaterialXValue("1 1,1", type: .color3) == .numbers([1, 1, 1]))
+        #expect(throws: MaterialXError.self) { try MaterialXValue("1, 2", type: .color3) }
+        #expect(throws: MaterialXError.self) { try MaterialXValue("1.5", type: .integer) }
+        #expect(throws: MaterialXError.self) { try MaterialXValue("yes", type: .boolean) }
     }
 
     /// #4: typedefs, including struct members, are read.
@@ -157,7 +157,7 @@ struct DocumentTests {
           <typedef name="texcoord_struct"><member name="uv" type="vector2" value="0, 0" /><member name="set" type="integer" /></typedef>
         </materialx>
         """
-        let typeDef = try #require(try Document(data: Data(source.utf8)).typeDefs.first)
+        let typeDef = try #require(try MaterialXDocument(data: Data(source.utf8)).typeDefs.first)
         #expect(typeDef.members.map(\.name) == ["uv", "set"])
         #expect(typeDef.members.map(\.type) == [.vector2, .integer])
     }
@@ -166,7 +166,7 @@ struct DocumentTests {
     /// test is reported as skipped instead of passing with zero cases; the vendored corpus (#48) still runs there.
     @Test(.enabled(if: !SystemMaterialXFiles.urls.isEmpty, "No system or Reality Composer Pro .mtlx files installed"), arguments: SystemMaterialXFiles.urls)
     func systemFileParses(url: URL) throws {
-        let document = try Document(url: url)
+        let document = try MaterialXDocument(url: url)
         #expect(document.root.tag == "materialx")
     }
 }
@@ -221,7 +221,7 @@ struct LookTests {
     }
 
     @Test func materialAssignmentFollowsLooksAndCollections() throws {
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         func materials(_ geometry: String) throws -> [String] {
             try document.materialAssignments(for: geometry, look: "L_furniture").map(\.material)
         }
@@ -233,7 +233,7 @@ struct LookTests {
     }
 
     @Test func variantsAndGeomInfo() throws {
-        let document = try Document(data: Data(Self.source.utf8))
+        let document = try MaterialXDocument(data: Data(Self.source.utf8))
         let finish = try #require(try document.variantSets().first)
         #expect(Set(finish.variants.keys) == ["dark", "light"])
         #expect(finish.variants["dark"]?.first?.value == .numbers([0.1, 0.05, 0]))
@@ -247,7 +247,7 @@ struct LookTests {
           <collection name="A" includecollection="B" /><collection name="B" includecollection="A" />
         </materialx>
         """
-        let document = try Document(data: Data(source.utf8))
+        let document = try MaterialXDocument(data: Data(source.utf8))
         #expect(throws: MaterialXError.self) { try document.collection("A", contains: "/x") }
     }
 }
@@ -256,8 +256,8 @@ struct LookTests {
 struct WriterTests {
     @Test(arguments: SystemMaterialXFiles.urls.prefix(10) + [StandardLibrary.bundledLibrariesURL.appendingPathComponent("stdlib/stdlib_defs.mtlx")])
     func roundTrip(url: URL) throws {
-        let document = try Document(url: url)
-        let reparsed = try Document(data: document.data())
+        let document = try MaterialXDocument(url: url)
+        let reparsed = try MaterialXDocument(data: document.data())
         #expect(reparsed.root == document.root)
     }
 
@@ -268,14 +268,14 @@ struct WriterTests {
           <output name="out" type="color3" nodename="c" />
         </nodegraph></materialx>
         """
-        var root = try Document(data: Data(source.utf8)).root
+        var root = try MaterialXDocument(data: Data(source.utf8)).root
         root.children[0].children[0].children[0].attributes["value"] = "0, 1, 0"
         root.children[0].children[0].attributes["note"] = "a < b & \"c\""
-        let edited = try Document(root: root)
+        let edited = try MaterialXDocument(root: root)
         let text = try #require(String(data: edited.data(), encoding: .utf8))
         #expect(text.hasPrefix("<?xml version=\"1.0\"?>\n<materialx version=\"1.39\">"))
         #expect(text.contains("<constant name=\"c\" type=\"color3\" note=\"a &lt; b &amp; &quot;c&quot;\">"))
-        let reparsed = try Document(data: edited.data())
+        let reparsed = try MaterialXDocument(data: edited.data())
         #expect(reparsed.nodeGraph("g")?.nodes["c"]?.input("value")?.value == .numbers([0, 1, 0]))
         #expect(reparsed.root == root)
     }

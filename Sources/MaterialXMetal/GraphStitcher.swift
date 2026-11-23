@@ -104,7 +104,7 @@ public struct StitchedGraph: @unchecked Sendable {
 
     /// Writes `value` into the slots of parameter `name`. Throws if there is no such parameter or the value does
     /// not have the parameter type's component count.
-    public mutating func set(_ name: String, to value: Value) throws {
+    public mutating func set(_ name: String, to value: MaterialXValue) throws {
         guard let parameter = parameter(name) else {
             throw MaterialXError.invalidValue("no parameter '\(name)'")
         }
@@ -152,8 +152,8 @@ public struct GraphStitcher {
     }
 
     /// Stitches what a shader input is connected to: a nodegraph output (`nodegraph`/`output`) or a document-level
-    /// node (`nodename`). Throws for unconnected inputs; read their ``Input/value`` instead.
-    public func stitch(_ input: Input, in document: Document, functionName: String) throws -> StitchedGraph {
+    /// node (`nodename`). Throws for unconnected inputs; read their ``MaterialXInput/value`` instead.
+    public func stitch(_ input: MaterialXInput, in document: MaterialXDocument, functionName: String) throws -> StitchedGraph {
         if let graphName = input.nodeGraph {
             guard let graph = document.nodeGraph(graphName) else {
                 throw MaterialXError.invalidDocument("input '\(input.name)' references missing nodegraph '\(graphName)'")
@@ -167,13 +167,13 @@ public struct GraphStitcher {
     }
 
     /// The document's top-level nodes as one nodegraph whose single output reads `nodeName`.
-    static func documentLevelGraph(_ document: Document, output nodeName: String, outputName: String? = nil, type: ValueType, extraNodes: [Element] = []) throws -> NodeGraph {
+    static func documentLevelGraph(_ document: MaterialXDocument, output nodeName: String, outputName: String? = nil, type: ValueType, extraNodes: [MaterialXElement] = []) throws -> NodeGraph {
         let skipped: Set<ValueType> = [.surfaceshader, .material]
         var children = document.nodes.filter { !skipped.contains($0.type) }.map(\.element) + extraNodes
         var attributes = ["name": "out", "type": type.rawValue, "nodename": nodeName]
         attributes["output"] = outputName
-        children.append(Element(tag: "output", attributes: attributes))
-        return try NodeGraph(Element(tag: "nodegraph", attributes: ["name": "__document"], children: children))
+        children.append(MaterialXElement(tag: "output", attributes: attributes))
+        return try NodeGraph(MaterialXElement(tag: "nodegraph", attributes: ["name": "__document"], children: children))
     }
 
     /// Compiles `graph`'s output. Color constants tagged with a `colorspace` (on the input, its node, the graph, or
@@ -323,7 +323,7 @@ struct Builder {
         /// The inherited colorspace for color values. `nil` inside functional nodegraphs, whose constants are raw.
         var colorSpace: String?
         /// String and filename interface inputs bound to the calling node's values (they cannot be stitched).
-        var strings: [String: Value]
+        var strings: [String: MaterialXValue]
         /// The inherited `fileprefix`.
         var filePrefix: String?
     }
@@ -355,7 +355,7 @@ struct Builder {
     var slotPointer = GraphPlan.Operand.parameters
     var previousSlotCount = 0
 
-    static func input(_ name: String, of nodeDef: NodeDef) throws -> Input {
+    static func input(_ name: String, of nodeDef: NodeDef) throws -> MaterialXInput {
         guard let input = nodeDef.input(name) else {
             throw MaterialXError.invalidDocument("\(nodeDef.name) has no input '\(name)'")
         }
@@ -363,7 +363,7 @@ struct Builder {
     }
 
     /// A string or filename input's value: set on the node, bound through the graph interface, or the default.
-    func stringValue(_ name: String, of node: Node, nodeDef: NodeDef, in scope: Scope) -> String? {
+    func stringValue(_ name: String, of node: MaterialXNode, nodeDef: NodeDef, in scope: Scope) -> String? {
         let input = node.input(name)
         if case let .string(value)? = input?.value {
             return value
@@ -384,12 +384,12 @@ struct Builder {
 
     /// The nodedef inputs a Metal function takes: stitchable values, plus `space`, which becomes an integer. Other
     /// string inputs, such as geompropvalue's `geomprop` name, are resolved by the stitcher and not passed.
-    static func functionInputs(_ nodeDef: NodeDef) -> [Input] {
+    static func functionInputs(_ nodeDef: NodeDef) -> [MaterialXInput] {
         nodeDef.inputs.filter { $0.type.isStitchable || ($0.name == "space" && $0.type == .string) }
     }
 
     /// The integer the Metal geometry functions take for a `space` input: 0 object (and model), 1 world.
-    static func spaceCode(_ value: Value?) throws -> Int {
+    static func spaceCode(_ value: MaterialXValue?) throws -> Int {
         guard case let .string(space) = value ?? .string("object") else {
             throw MaterialXError.invalidValue("space \(String(describing: value))")
         }
@@ -469,7 +469,7 @@ struct Builder {
             throw MaterialXError.missingNodeDef(node: "\(node.name) (\(node.category), \(node.type))")
         }
         // Inputs are resolved once per node, so every output of a multi-output node shares them.
-        func argument(_ definition: Input) throws -> GraphPlan.Operand {
+        func argument(_ definition: MaterialXInput) throws -> GraphPlan.Operand {
             let argumentKey = nodeKey + "." + definition.name
             if let cached = nodeArguments[argumentKey] {
                 return cached
@@ -516,7 +516,7 @@ struct Builder {
             // Inputs with no stitchable value type (filenames, strings) are left unbound; the graph only fails if it
             // reads one.
             var bindings: [String: GraphPlan.Operand] = [:]
-            var strings: [String: Value] = [:]
+            var strings: [String: MaterialXValue] = [:]
             for definition in nodeDef.inputs {
                 if definition.type.isStitchable {
                     bindings[definition.name] = try argument(definition)
@@ -536,7 +536,7 @@ struct Builder {
         return stitchingNode
     }
 
-    mutating func inline(_ graph: NodeGraph, output outputName: String?, bindings: [String: GraphPlan.Operand], strings: [String: Value] = [:], filePrefix: String? = nil, prefix: String) throws -> GraphPlan.Operand {
+    mutating func inline(_ graph: NodeGraph, output outputName: String?, bindings: [String: GraphPlan.Operand], strings: [String: MaterialXValue] = [:], filePrefix: String? = nil, prefix: String) throws -> GraphPlan.Operand {
         guard let output = outputName.flatMap(graph.output) ?? graph.outputs.first else {
             throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no output \(outputName ?? "")")
         }
@@ -550,7 +550,7 @@ struct Builder {
         throw MaterialXError.invalidDocument("functional nodegraph '\(graph.name)' has no connected output")
     }
 
-    mutating func resolve(input: Input?, definition: Input, owner: String, nodeColorSpace: String?, in scope: Scope) throws -> GraphPlan.Operand {
+    mutating func resolve(input: MaterialXInput?, definition: MaterialXInput, owner: String, nodeColorSpace: String?, in scope: Scope) throws -> GraphPlan.Operand {
         if let upstream = input?.nodeName {
             return try resolve(nodeName: upstream, output: input?.output, in: scope)
         }
@@ -617,7 +617,7 @@ struct Builder {
     }
 
     /// `value` converted from the input's `unit` to the stitcher's target unit of the same unit type.
-    func converted(_ value: Value?, input: Input, definition: Input) -> Value? {
+    func converted(_ value: MaterialXValue?, input: MaterialXInput, definition: MaterialXInput) -> MaterialXValue? {
         guard let unit = input.element["unit"], let numbers = value?.numbers,
               let unitType = input.element["unittype"] ?? definition.element["unittype"],
               let scales = stitcher.standardLibrary.units[unitType], let from = scales[unit],
@@ -626,7 +626,7 @@ struct Builder {
         return .numbers(numbers.map { $0 * from / to })
     }
 
-    mutating func parameter(name: String, type: ValueType, value: Value?) throws -> GraphPlan.Operand {
+    mutating func parameter(name: String, type: ValueType, value: MaterialXValue?) throws -> GraphPlan.Operand {
         let reader = try "mx_parameter_" + type.metalSuffix()
         let slots = Self.slots(for: type, numbers: value?.numbers ?? [])
         // Advance lazily, past the previous parameter's slots, so the graph has no unused trailing node.

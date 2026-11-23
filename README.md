@@ -20,7 +20,7 @@ Images, geometry nodes other than `texcoord`, procedural noise and surface shade
 ```swift
 import MetalSprocketsMaterialX
 
-let document = try Document(url: url)              // follows xi:include
+let document = try MaterialXDocument(url: url)     // follows xi:include
 for issue in document.validate() { print(issue) }  // dangling references, type mismatches, unknown nodes
 
 let stitcher = try GraphStitcher(
