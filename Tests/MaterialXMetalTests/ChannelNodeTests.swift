@@ -802,3 +802,96 @@ struct SurfaceStitchingTests {
         #expect(throws: MaterialXError.self) { try stitcher.stitchSurface(shader, in: document, functionName: "f") }
     }
 }
+
+/// #36: standard_surface and open_pbr_surface go through MaterialX's translation graphs to MXSurfaceInputs.
+@Suite(.serialized)
+struct SurfaceTranslationTests {
+    func surface(_ xml: String, shader: String) throws -> MXSurfaceInputs {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let document = try Document(data: Data(xml.utf8))
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let node = try #require(document.nodes.first { $0.name == shader })
+        let material = try stitcher.stitchSurface(node, in: document, functionName: "materialx_surface")
+        return try #require(try material.evaluateSurface(contexts: [MXShadingContext(texcoord: .zero)]).first)
+    }
+
+    @Test func standardSurfaceTranslates() throws {
+        let value = try surface("""
+        <materialx version="1.39">
+          <standard_surface name="s" type="surfaceshader">
+            <input name="base" type="float" value="1" />
+            <input name="base_color" type="color3" value="0.8, 0.2, 0.1" />
+            <input name="metalness" type="float" value="0.7" />
+            <input name="specular_roughness" type="float" value="0.3" />
+            <input name="specular_IOR" type="float" value="1.4" />
+            <input name="emission" type="float" value="1" />
+            <input name="emission_color" type="color3" value="0, 0.5, 0" />
+          </standard_surface>
+        </materialx>
+        """, shader: "s")
+        #expect(simd_distance(value.baseColor, [0.8, 0.2, 0.1]) < 1e-5)
+        #expect(abs(value.metallic - 0.7) < 1e-6)
+        #expect(abs(value.roughness - 0.3) < 1e-6)
+        #expect(abs(value.ior - 1.4) < 1e-6)
+        #expect(simd_distance(value.emissive, [0, 0.5, 0]) < 1e-5)
+    }
+
+    @Test func openPBRTranslatesThroughStandardSurface() throws {
+        let value = try surface("""
+        <materialx version="1.39">
+          <open_pbr_surface name="s" type="surfaceshader">
+            <input name="base_color" type="color3" value="0.1, 0.2, 0.9" />
+            <input name="base_metalness" type="float" value="0.5" />
+            <input name="specular_roughness" type="float" value="0.4" />
+          </open_pbr_surface>
+        </materialx>
+        """, shader: "s")
+        #expect(simd_distance(value.baseColor, [0.1, 0.2, 0.9]) < 1e-5)
+        #expect(abs(value.metallic - 0.5) < 1e-6)
+        #expect(abs(value.roughness - 0.4) < 1e-6)
+        #expect(value.clearcoat == 0)
+    }
+
+    /// MaterialX's OpenPBR translation lets a full coat replace the specular roughness with the coat's
+    /// (`mix(specular_roughness, coat_roughness, coat_weight)`) and darkens the base by the coat's internal reflection.
+    @Test func openPBRCoatFollowsTheTranslation() throws {
+        let value = try surface("""
+        <materialx version="1.39">
+          <open_pbr_surface name="s" type="surfaceshader">
+            <input name="base_color" type="color3" value="0.1, 0.2, 0.9" />
+            <input name="specular_roughness" type="float" value="0.4" />
+            <input name="coat_weight" type="float" value="1" />
+            <input name="coat_roughness" type="float" value="0.25" />
+          </open_pbr_surface>
+        </materialx>
+        """, shader: "s")
+        #expect(abs(value.clearcoat - 1) < 1e-6)
+        #expect(abs(value.clearcoatRoughness - 0.25) < 1e-6)
+        #expect(abs(value.roughness - 0.25) < 1e-6)
+        #expect(value.baseColor.z < 0.9 && value.baseColor.z > 0.5)
+    }
+
+    /// Every surface shader in the corpus either stitches or fails only on an unimplemented node.
+    @Test func corpusShadersStitchOrAreUnsupported() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let nodeLibrary = try MetalNodeLibrary(device: device)
+        var stitched = 0
+        var errors: [String] = []
+        for url in CorpusTests.files {
+            let document = try Document(url: url)
+            let stitcher = GraphStitcher(nodeLibrary: nodeLibrary, standardLibrary: StandardLibrary.shared.merging([document]))
+            for shader in document.nodes where shader.type == .surfaceshader && SurfaceMapping.builtIn[shader.category] != nil {
+                do {
+                    _ = try stitcher.stitchSurface(shader, in: document, functionName: "corpus_surface")
+                    stitched += 1
+                } catch MaterialXError.unsupportedNode {
+                } catch {
+                    errors.append("\(url.lastPathComponent) \(shader.name): \(error)")
+                }
+            }
+        }
+        print("corpus surfaces stitched: \(stitched)")
+        #expect(stitched > 20)
+        #expect(errors.isEmpty, "\(errors)")
+    }
+}

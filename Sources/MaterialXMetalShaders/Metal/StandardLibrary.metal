@@ -7,6 +7,8 @@ using namespace metal;
 typedef thread const MXShadingContext &MXContext;
 typedef constant MXTexture *MXTextures;
 
+constant float MX_FLOAT_EPS = 1e-8;
+
 // Stitchable implementations of MaterialX stdlib nodes. Each function is named after its nodedef with `ND_` replaced
 // by `mx_`, and takes the nodedef's inputs in declaration order.
 
@@ -214,6 +216,26 @@ MX_POWER(color4FA, float4, float)
     [[stitchable]] float4 mx_##NAME##_color4(float4 in) { return EXPR; }
 MX_UNARY(absval, abs(in))
 MX_UNARY(sign, sign(in))
+MX_UNARY(sqrt, sqrt(in))
+MX_UNARY(dot, in)
+[[stitchable]] int mx_dot_integer(int in) { return in; }
+[[stitchable]] bool mx_dot_boolean(bool in) { return in; }
+[[stitchable]] float3x3 mx_dot_matrix33(float3x3 in) { return in; }
+[[stitchable]] float4x4 mx_dot_matrix44(float4x4 in) { return in; }
+
+// pbrlib, from MaterialX's mx_roughness_anisotropy.glsl.
+[[stitchable]] float2 mx_roughness_anisotropy(float roughness, float anisotropy) {
+    float roughnessSquared = clamp(roughness * roughness, MX_FLOAT_EPS, 1.0);
+    if (anisotropy > 0.0) {
+        float aspect = sqrt(1.0 - clamp(anisotropy, 0.0, 0.98));
+        return float2(min(roughnessSquared / aspect, 1.0), roughnessSquared * aspect);
+    }
+    return float2(roughnessSquared);
+}
+
+[[stitchable]] float mx_dotproduct_vector2(float2 in1, float2 in2) { return dot(in1, in2); }
+[[stitchable]] float mx_dotproduct_vector3(float3 in1, float3 in2) { return dot(in1, in2); }
+[[stitchable]] float mx_dotproduct_vector4(float4 in1, float4 in2) { return dot(in1, in2); }
 
 #define MX_CLAMP(SUFFIX, T, U) \
     [[stitchable]] T mx_clamp_##SUFFIX(T in, U low, U high) { return clamp(in, T(low), T(high)); }
@@ -247,8 +269,6 @@ MX_MIX(color4_color4, float4, float4)
 // MARK: Adjustment
 // Ported from MaterialX's genglsl implementations. range, colorcorrect, hsvadjust and saturate are functional
 // nodegraphs built from these.
-
-constant float MX_FLOAT_EPS = 1e-8;
 
 #define MX_REMAP(SUFFIX, T, U) \
     [[stitchable]] T mx_remap_##SUFFIX(T in, U inlow, U inhigh, U outlow, U outhigh) { \

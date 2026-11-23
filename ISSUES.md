@@ -654,19 +654,21 @@ PBR.metal reads material values from uniforms and textures directly. There is no
 ## 36: standard_surface and open_pbr_surface parameters do not map one-to-one onto glTF PBR
 
 +++
-status: open
+status: closed
 priority: high
 kind: task
 labels: effort:m, area:pbr, area:shading
 depends: 34
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:03:07Z
+updated: 2026-11-23T14:02:23Z
+closed: 2026-11-23T14:02:23Z
 +++
 
 Coat, sheen, subsurface, thin film, specular_anisotropy, transmission_depth/scatter etc. have no exact equivalent in glTF PBR. The bundled translation graphs (bxdf/translation/standard_surface_to_gltf_pbr.mtlx, open_pbr_to_standard_surface.mtlx) are not used, and the approximations to accept are undecided.
 
 - `2026-11-23T13:03:07Z`: Question 1 (decision): Convert standard_surface/open_pbr_surface to glTF PBR inputs using the bundled translation nodegraphs (standard_surface_to_gltf_pbr.mtlx, open_pbr_to_standard_surface.mtlx), stitched like any functional graph, and accept their approximations (coat->clearcoat, sheen->sheen, subsurface dropped)? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:02:23Z`: Per #36-Q1: standard_surface and open_pbr_surface reach MXSurfaceInputs through MaterialX's own translation graphs (bxdf/translation): standard_surface → standard_surface_to_gltf_pbr; open_pbr_surface → open_pbr_surface_to_standard_surface → standard_surface_to_gltf_pbr. SurfaceMapping gained translations + translatedFields; geometry inputs (normal, coat normal), IOR and specular are read straight from the shader. Their approximations are MaterialX's: e.g. an OpenPBR coat replaces specular roughness with the coat's and darkens the base (openPBRCoatFollowsTheTranslation). Added the nodes the graphs need: dot, sqrt, dotproduct, roughness_anisotropy (from MaterialX's GLSL). Builder now resolves nodegraph= inputs on document-level nodes. Corpus: 41 surface shaders stitch end to end. Tests: SurfaceTranslationTests. Coverage baseline regenerated (334 metal, 121 nodeGraph).
 
 ---
 

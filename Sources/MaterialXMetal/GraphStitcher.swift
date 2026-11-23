@@ -167,9 +167,9 @@ public struct GraphStitcher {
     }
 
     /// The document's top-level nodes as one nodegraph whose single output reads `nodeName`.
-    static func documentLevelGraph(_ document: Document, output nodeName: String, outputName: String? = nil, type: ValueType) throws -> NodeGraph {
+    static func documentLevelGraph(_ document: Document, output nodeName: String, outputName: String? = nil, type: ValueType, extraNodes: [Element] = []) throws -> NodeGraph {
         let skipped: Set<ValueType> = [.surfaceshader, .material]
-        var children = document.nodes.filter { !skipped.contains($0.type) }.map(\.element)
+        var children = document.nodes.filter { !skipped.contains($0.type) }.map(\.element) + extraNodes
         var attributes = ["name": "out", "type": type.rawValue, "nodename": nodeName]
         attributes["output"] = outputName
         children.append(Element(tag: "output", attributes: attributes))
@@ -329,6 +329,19 @@ struct Builder {
     }
 
     var textures: [TextureBinding] = []
+    /// The document's nodegraphs, for inputs with `nodegraph=` (document-level nodes and shaders).
+    var documentGraphs: [String: NodeGraph] = [:]
+    var documentColorSpace: String?
+    var documentFilePrefix: String?
+
+    /// Output `outputName` (or the first) of document nodegraph `name`, each graph in its own scope.
+    mutating func resolve(nodeGraph name: String, output outputName: String?) throws -> GraphPlan.Operand {
+        guard let graph = documentGraphs[name], let output = outputName.flatMap(graph.output) ?? graph.outputs.first, let nodeName = output.nodeName else {
+            throw MaterialXError.invalidDocument("missing nodegraph output \(name).\(outputName ?? "")")
+        }
+        let scope = Scope(graph: graph, prefix: graph.name + "/", bindings: [:], colorSpace: graph.element["colorspace"] ?? documentColorSpace, strings: [:], filePrefix: graph.element["fileprefix"] ?? documentFilePrefix)
+        return try resolve(nodeName: nodeName, output: output.output, in: scope)
+    }
 
     let stitcher: GraphStitcher
     var calls: [GraphPlan.Call] = []
@@ -540,6 +553,9 @@ struct Builder {
     mutating func resolve(input: Input?, definition: Input, owner: String, nodeColorSpace: String?, in scope: Scope) throws -> GraphPlan.Operand {
         if let upstream = input?.nodeName {
             return try resolve(nodeName: upstream, output: input?.output, in: scope)
+        }
+        if let graphName = input?.nodeGraph {
+            return try resolve(nodeGraph: graphName, output: input?.output)
         }
         if let interfaceName = input?.interfaceName {
             if let bound = scope.bindings[interfaceName] {

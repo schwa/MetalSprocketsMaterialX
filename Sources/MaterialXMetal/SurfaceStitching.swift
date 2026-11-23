@@ -2,22 +2,38 @@ import MaterialX
 import MaterialXMetalShaders
 
 /// How a surface shader's inputs map onto `MXSurfaceInputs` fields.
+///
+/// Shaders that are not metallic-roughness (standard_surface, open_pbr_surface) are first run through MaterialX's
+/// translation nodegraphs (`bxdf/translation`), as #36-Q1 chose: `translations` lists the translation node
+/// categories in order, and `translatedFields` reads the last one's outputs. Their approximations are MaterialX's: coat
+/// becomes clearcoat, sheen stays sheen, subsurface and thin film are dropped.
 public struct SurfaceMapping: Sendable {
     public struct Field: Sendable {
-        /// The shader's input name.
-        public var input: String
+        /// A shader input name, or a translation output name.
+        public var source: String
         /// The `MXSurfaceInputs` field (and `mx_surface_set_<field>` setter).
         public var field: String
     }
 
+    /// Read straight from the shader's inputs.
     public var fields: [Field]
+    public var translations: [String]
+    /// Read from the last translation node's outputs.
+    public var translatedFields: [Field]
 
-    public init(_ fields: [(input: String, field: String)]) {
-        self.fields = fields.map { Field(input: $0.input, field: $0.field) }
+    public init(_ fields: [(input: String, field: String)], translations: [String] = [], translatedFields: [(output: String, field: String)] = []) {
+        self.fields = fields.map { Field(source: $0.input, field: $0.field) }
+        self.translations = translations
+        self.translatedFields = translatedFields.map { Field(source: $0.output, field: $0.field) }
     }
 
-    /// Mappings by surface shader category. standard_surface and open_pbr_surface go through their translation
-    /// graphs (#36).
+    static let gltfTranslatedFields: [(output: String, field: String)] = [
+        ("base_color_out", "baseColor"), ("metallic_out", "metallic"), ("roughness_out", "roughness"),
+        ("transmission_out", "transmission"), ("sheen_color_out", "sheenColor"), ("sheen_roughness_out", "sheenRoughness"),
+        ("clearcoat_out", "clearcoat"), ("clearcoat_roughness_out", "clearcoatRoughness"), ("emissive_out", "emissive"),
+    ]
+
+    /// Mappings by surface shader category.
     public static let builtIn: [String: Self] = [
         "gltf_pbr": Self([
             ("base_color", "baseColor"), ("metallic", "metallic"), ("roughness", "roughness"), ("normal", "normal"),
@@ -33,6 +49,16 @@ public struct SurfaceMapping: Sendable {
             ("metallic", "metallic"), ("roughness", "roughness"), ("clearcoat", "clearcoat"),
             ("clearcoatRoughness", "clearcoatRoughness"), ("opacity", "opacity"), ("ior", "ior"), ("occlusion", "occlusion"),
         ]),
+        "standard_surface": Self(
+            [("normal", "normal"), ("coat_normal", "clearcoatNormal"), ("specular_IOR", "ior"), ("specular", "specular"), ("specular_color", "specularColor")],
+            translations: ["standard_surface_to_gltf_pbr"],
+            translatedFields: gltfTranslatedFields
+        ),
+        "open_pbr_surface": Self(
+            [("geometry_normal", "normal"), ("geometry_coat_normal", "clearcoatNormal"), ("specular_ior", "ior"), ("specular_weight", "specular"), ("specular_color", "specularColor"), ("geometry_opacity", "opacity")],
+            translations: ["open_pbr_surface_to_standard_surface", "standard_surface_to_gltf_pbr"],
+            translatedFields: gltfTranslatedFields
+        ),
     ]
 }
 
@@ -74,29 +100,50 @@ public extension GraphStitcher {
             throw MaterialXError.missingNodeDef(node: "\(shader.name) (\(shader.category))")
         }
         var builder = Builder(stitcher: self)
-        let documentScope = try Builder.Scope(
-            graph: Self.documentLevelGraph(document, output: shader.name, type: .surfaceshader),
-            prefix: "",
-            bindings: [:],
-            colorSpace: document.colorSpace,
-            strings: [:],
-            filePrefix: document.root["fileprefix"]
-        )
+        builder.documentGraphs = Dictionary(document.nodeGraphs.map { ($0.name, $0) }) { first, _ in first }
+        builder.documentColorSpace = document.colorSpace
+        builder.documentFilePrefix = document.root["fileprefix"]
+
+        // Translation nodes sit beside the document-level nodes: the first copies the shader's inputs, each later
+        // one reads the previous one's `<input>_out` outputs.
+        var translationNames: [String] = []
+        var extraNodes: [Element] = []
+        for (index, category) in mapping.translations.enumerated() {
+            let name = "\(shader.name)#\(category)"
+            guard let translationDef = standardLibrary.nodeDefs.values.first(where: { $0.node == category }) else {
+                throw MaterialXError.missingNodeDef(node: category)
+            }
+            var inputs: [Element]
+            if index == 0 {
+                // Only the inputs the translation declares (geometry inputs are read straight from the shader).
+                inputs = shader.element.children(tag: "input").filter { input in
+                    input.name.flatMap(translationDef.input)?.type.rawValue == input["type"]
+                }
+            } else {
+                let previous = translationNames[index - 1]
+                let previousOutputs = Set((standardLibrary.nodeDefs.values.first { $0.node == mapping.translations[index - 1] }?.outputs ?? []).map(\.name))
+                // Inputs the previous translation has no `<input>_out` for keep their defaults.
+                inputs = translationDef.inputs.filter { previousOutputs.contains($0.name + "_out") }.map { input in
+                    Element(tag: "input", attributes: ["name": input.name, "type": input.type.rawValue, "nodename": previous, "output": input.name + "_out"])
+                }
+            }
+            extraNodes.append(Element(tag: category, attributes: ["name": name, "type": "multioutput"], children: inputs))
+            translationNames.append(name)
+        }
+        let documentGraph = try Self.documentLevelGraph(document, output: shader.name, type: .surfaceshader, extraNodes: extraNodes)
+        let documentScope = Builder.Scope(graph: documentGraph, prefix: "", bindings: [:], colorSpace: document.colorSpace, strings: [:], filePrefix: document.root["fileprefix"])
+
         var surface = GraphPlan.Operand.surface
         for field in mapping.fields {
-            guard let definition = nodeDef.input(field.input) else { continue }
-            let input = shader.input(field.input)
-            let value: GraphPlan.Operand
-            if let graphName = input?.nodeGraph {
-                guard let graph = document.nodeGraph(graphName), let output = input?.output.flatMap(graph.output) ?? graph.outputs.first, let nodeName = output.nodeName else {
-                    throw MaterialXError.invalidDocument("\(shader.name).\(field.input) reads a missing nodegraph output")
-                }
-                let scope = Builder.Scope(graph: graph, prefix: graph.name + "/", bindings: [:], colorSpace: graph.element["colorspace"] ?? document.colorSpace, strings: [:], filePrefix: graph.element["fileprefix"] ?? document.root["fileprefix"])
-                value = try builder.resolve(nodeName: nodeName, output: output.output, in: scope)
-            } else {
-                value = try builder.resolve(input: input, definition: definition, owner: shader.name, nodeColorSpace: shader.element["colorspace"] ?? document.colorSpace, in: documentScope)
-            }
+            guard let definition = nodeDef.input(field.source) else { continue }
+            let value = try builder.resolve(input: shader.input(field.source), definition: definition, owner: shader.name, nodeColorSpace: shader.element["colorspace"] ?? document.colorSpace, in: documentScope)
             surface = try builder.call("mx_surface_set_" + field.field, [surface, value])
+        }
+        if let translation = translationNames.last {
+            for field in mapping.translatedFields {
+                let value = try builder.resolve(nodeName: translation, output: field.source, in: documentScope)
+                surface = try builder.call("mx_surface_set_" + field.field, [surface, value])
+            }
         }
         _ = try builder.call("mx_surface_output", [surface, .context, .parameters, .textures])
         return GraphPlan(functionName: functionName, outputType: .surfaceshader, calls: builder.calls, parameters: builder.parameters, parameterData: builder.parameterData, textures: builder.textures)

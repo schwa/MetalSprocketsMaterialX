@@ -37,6 +37,7 @@ ND_blur_vector4 nodeGraph
 ND_burn_color3 metal
 ND_burn_color4 metal
 ND_burn_float metal
+ND_circle_float nodeGraph
 ND_clamp_color3 metal
 ND_clamp_color3FA metal
 ND_clamp_color4 metal
@@ -48,6 +49,7 @@ ND_clamp_vector3 metal
 ND_clamp_vector3FA metal
 ND_clamp_vector4 metal
 ND_clamp_vector4FA metal
+ND_cloverleaf_float nodeGraph
 ND_colorcorrect_color3 nodeGraph
 ND_colorcorrect_color4 nodeGraph
 ND_combine2_color4CF metal
@@ -136,6 +138,19 @@ ND_divide_vector4FA metal
 ND_dodge_color3 metal
 ND_dodge_color4 metal
 ND_dodge_float metal
+ND_dot_boolean metal
+ND_dot_color3 metal
+ND_dot_color4 metal
+ND_dot_float metal
+ND_dot_integer metal
+ND_dot_matrix33 metal
+ND_dot_matrix44 metal
+ND_dot_vector2 metal
+ND_dot_vector3 metal
+ND_dot_vector4 metal
+ND_dotproduct_vector2 metal
+ND_dotproduct_vector3 metal
+ND_dotproduct_vector4 metal
 ND_extract_color3 metal
 ND_extract_color4 metal
 ND_extract_vector2 metal
@@ -159,6 +174,7 @@ ND_geompropvalue_integer metal
 ND_geompropvalue_vector2 metal
 ND_geompropvalue_vector3 metal
 ND_geompropvalue_vector4 metal
+ND_hexagon_float nodeGraph
 ND_hsvadjust_color3 nodeGraph
 ND_hsvadjust_color4 nodeGraph
 ND_hsvtorgb_color3 metal
@@ -289,6 +305,7 @@ ND_multiply_vector3FA metal
 ND_multiply_vector4 metal
 ND_multiply_vector4FA metal
 ND_normal_vector3 metal
+ND_open_pbr_surface_to_standard_surface nodeGraph
 ND_out_color4 metal
 ND_outside_color3 metal
 ND_outside_color4 metal
@@ -333,6 +350,8 @@ ND_range_vector4 nodeGraph
 ND_range_vector4FA nodeGraph
 ND_rec709_display_to_lin_rec709_color3 nodeGraph
 ND_rec709_display_to_lin_rec709_color4 nodeGraph
+ND_reflect_vector3 nodeGraph
+ND_refract_vector3 nodeGraph
 ND_remap_color3 metal
 ND_remap_color3FA metal
 ND_remap_color4 metal
@@ -346,6 +365,7 @@ ND_remap_vector4 metal
 ND_remap_vector4FA metal
 ND_rgbtohsv_color3 metal
 ND_rgbtohsv_color4 metal
+ND_roughness_anisotropy metal
 ND_safepower_color3 nodeGraph
 ND_safepower_color3FA nodeGraph
 ND_safepower_color4 nodeGraph
@@ -384,10 +404,17 @@ ND_smoothstep_vector3 nodeGraph
 ND_smoothstep_vector3FA nodeGraph
 ND_smoothstep_vector4 nodeGraph
 ND_smoothstep_vector4FA nodeGraph
+ND_sqrt_float metal
+ND_sqrt_vector2 metal
+ND_sqrt_vector3 metal
+ND_sqrt_vector4 metal
 ND_srgb_displayp3_to_lin_rec709_color3 nodeGraph
 ND_srgb_displayp3_to_lin_rec709_color4 nodeGraph
 ND_srgb_texture_to_lin_rec709_color3 nodeGraph
 ND_srgb_texture_to_lin_rec709_color4 nodeGraph
+ND_standard_surface_to_UsdPreviewSurface nodeGraph
+ND_standard_surface_to_gltf_pbr nodeGraph
+ND_standard_surface_to_open_pbr_surface nodeGraph
 ND_subtract_color3 metal
 ND_subtract_color3FA metal
 ND_subtract_color4 metal
