@@ -39,6 +39,10 @@ let package = Package(
             ]
         ),
         .testTarget(name: "MaterialXTests", dependencies: ["MaterialX"]),
-        .testTarget(name: "MaterialXMetalTests", dependencies: ["MaterialX", "MaterialXMetal", "MetalSprocketsMaterialX"]),
+        .testTarget(
+            name: "MaterialXMetalTests",
+            dependencies: ["MaterialX", "MaterialXMetal", "MetalSprocketsMaterialX"],
+            resources: [.copy("Resources/stdlib_genglsl_impl.mtlx")]
+        ),
     ]
 )
