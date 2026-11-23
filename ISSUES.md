@@ -896,15 +896,18 @@ Package.swift declares iOS 26 and visionOS 26 but only macOS tests have run.
 ## 53: No README usage docs or DocC
 
 +++
-status: open
+status: closed
 priority: medium
 kind: documentation
 labels: effort:s, area:docs
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:29:16Z
+closed: 2026-11-23T13:29:16Z
 +++
 
 README is a stub. There is no usage example, architecture description (MaterialX → MaterialXMetal → MetalSprocketsMaterialX) or DocC catalog.
+
+- `2026-11-23T13:29:16Z`: README rewritten: module table, usage (load, validate, merge custom nodedefs, stitch a graph output or a shader input, edit parameters, VisibleFunction), the stitched function's signature and parameter layout, private vs binary linking, how stitching works (naming, functional graph inlining, colorspace/units, caching, output sink), coverage baseline, dev commands. No DocC catalog yet; doc comments are kept minimal per house rules.
 
 ---
 
