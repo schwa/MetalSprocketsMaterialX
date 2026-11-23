@@ -251,3 +251,32 @@ struct LookTests {
         #expect(throws: MaterialXError.self) { try document.collection("A", contains: "/x") }
     }
 }
+
+/// #8: documents can be written back to .mtlx.
+struct WriterTests {
+    @Test(arguments: SystemMaterialXFiles.urls.prefix(10) + [StandardLibrary.bundledLibrariesURL.appendingPathComponent("stdlib/stdlib_defs.mtlx")])
+    func roundTrip(url: URL) throws {
+        let document = try Document(url: url)
+        let reparsed = try Document(data: document.data())
+        #expect(reparsed.root == document.root)
+    }
+
+    @Test func editAndWrite() throws {
+        let source = """
+        <materialx version="1.39"><nodegraph name="g">
+          <constant name="c" type="color3"><input name="value" type="color3" value="1, 0, 0" /></constant>
+          <output name="out" type="color3" nodename="c" />
+        </nodegraph></materialx>
+        """
+        var root = try Document(data: Data(source.utf8)).root
+        root.children[0].children[0].children[0].attributes["value"] = "0, 1, 0"
+        root.children[0].children[0].attributes["note"] = "a < b & \"c\""
+        let edited = try Document(root: root)
+        let text = try #require(String(data: edited.data(), encoding: .utf8))
+        #expect(text.hasPrefix("<?xml version=\"1.0\"?>\n<materialx version=\"1.39\">"))
+        #expect(text.contains("<constant name=\"c\" type=\"color3\" note=\"a &lt; b &amp; &quot;c&quot;\">"))
+        let reparsed = try Document(data: edited.data())
+        #expect(reparsed.nodeGraph("g")?.nodes["c"]?.input("value")?.value == .numbers([0, 1, 0]))
+        #expect(reparsed.root == root)
+    }
+}

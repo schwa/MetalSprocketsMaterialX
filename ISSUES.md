@@ -133,15 +133,18 @@ closed: 2026-11-23T13:33:12Z
 ## 8: Documents cannot be written back to .mtlx
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:m, area:document
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:33:48Z
+closed: 2026-11-23T13:33:48Z
 +++
 
 Document and Element are read-only. There is no serializer, so tools cannot edit a material and save it.
+
+- `2026-11-23T13:33:48Z`: Element.xmlString(), Document.data() / write(to:) and a public Document(root:) for edited trees. Round-trips the bundled stdlib and system .mtlx files exactly (element tree equality). Limits: attribute order is normalized (name, type, nodedef, then sorted), XML comments are dropped by the parser, and xi:include content is written inline. Tests: WriterTests.
 
 ---
 

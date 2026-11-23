@@ -194,7 +194,8 @@ public struct Document: Sendable {
         return result
     }
 
-    private init(root: Element) throws {
+    /// A document from an element tree, for example an edited copy of another document's ``root``.
+    public init(root: Element) throws {
         guard root.tag == "materialx" else {
             throw MaterialXError.invalidDocument("root is <\(root.tag)>, not <materialx>")
         }
