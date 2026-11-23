@@ -229,3 +229,32 @@ struct TexcoordIndexTests {
         }
     }
 }
+
+/// #27: graphs with the same topology share one stitched library; constants stay per graph.
+@Suite(.serialized)
+struct StitchCacheTests {
+    func graph(_ color: String) -> String {
+        """
+        <materialx version="1.39"><nodegraph name="g">
+          <multiply name="n" type="color3"><input name="in1" type="color3" value="\(color)" /><input name="in2" type="float" value="2" /></multiply>
+          <output name="out" type="color3" nodename="n" />
+        </nodegraph></materialx>
+        """
+    }
+
+    @Test func sameTopologyReusesLibrary() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let nodeLibrary = try MetalNodeLibrary(device: device)
+        let stitcher = GraphStitcher(nodeLibrary: nodeLibrary)
+        let red = try stitcher.stitch(try #require(Document(data: Data(graph("0.5, 0, 0").utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        let blue = try stitcher.stitch(try #require(Document(data: Data(graph("0, 0, 0.25").utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        #expect(red.library === blue.library)
+        #expect(nodeLibrary.stitchCount == 1)
+        #expect(try StitchingTests().evaluate(red, device: device)[0] == [1, 0, 0, 1])
+        #expect(try StitchingTests().evaluate(blue, device: device)[0] == [0, 0, 0.5, 1])
+
+        let renamed = try stitcher.stitch(try #require(Document(data: Data(graph("0, 0, 0.25").utf8)).nodeGraph("g")), functionName: "other_name")
+        #expect(renamed.library !== red.library)
+        #expect(nodeLibrary.stitchCount == 2)
+    }
+}

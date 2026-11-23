@@ -432,15 +432,18 @@ GraphStitcher compiles a NodeGraph only. Shader inputs connected with nodegraph=
 ## 27: Stitched libraries are not cached
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: effort:s, area:stitching, area:performance
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:06:12Z
+closed: 2026-11-23T13:06:12Z
 +++
 
 Every stitch() call builds a new MTLStitchedLibrary. Two materials with the same graph topology but different constant values produce identical libraries. There is no cache keyed by topology, and no measurement of stitch cost per graph size.
+
+- `2026-11-23T13:06:12Z`: MetalNodeLibrary caches stitched libraries by function name + graph topology (wiring, not constants); stitchCount reports misses. Node function cache is now Mutex-protected. Test: StitchCacheTests. Stitch-cost numbers are #28.
 
 ---
 

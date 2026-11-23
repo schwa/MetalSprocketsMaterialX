@@ -1,11 +1,14 @@
 import MaterialX
 import Metal
+import Synchronization
 
 /// The `[[stitchable]]` node implementations bundled with this package.
 public final class MetalNodeLibrary: @unchecked Sendable {
     public let device: MTLDevice
     public let library: MTLLibrary
-    private var cache: [String: MTLFunction] = [:]
+    private let functions = Mutex<[String: MTLFunction]>([:])
+    /// Stitched functions by topology key (function name plus graph wiring). Constant values are not part of the key.
+    private let stitchedFunctions = Mutex<[String: (MTLLibrary, MTLFunction)]>([:])
 
     public init(device: MTLDevice) throws {
         self.device = device
@@ -25,14 +28,36 @@ public final class MetalNodeLibrary: @unchecked Sendable {
     }
 
     public func function(named name: String) throws -> MTLFunction {
-        if let function = cache[name] {
+        if let function = functions.withLock({ $0[name] }) {
             return function
         }
         guard let function = library.makeFunction(name: name) else {
             throw MaterialXError.unsupportedNode(name)
         }
-        cache[name] = function
+        functions.withLock { $0[name] = function }
         return function
+    }
+
+    /// Number of stitched libraries built (cache misses).
+    public var stitchCount: Int {
+        stitchCounter.withLock { $0 }
+    }
+
+    private let stitchCounter = Mutex(0)
+
+    func stitchedFunction(key: String, make: () throws -> (MTLLibrary, MTLFunction)) throws -> (MTLLibrary, MTLFunction) {
+        if let cached = stitchedFunctions.withLock({ $0[key] }) {
+            return cached
+        }
+        let made = try make()
+        stitchCounter.withLock { $0 += 1 }
+        return stitchedFunctions.withLock { cache in
+            if let existing = cache[key] {
+                return existing
+            }
+            cache[key] = made
+            return made
+        }
     }
 }
 
@@ -107,13 +132,17 @@ public struct GraphStitcher {
         var builder = Builder(stitcher: self)
         let value = try builder.resolve(nodeName: nodeName, output: output.output, in: .init(graph: graph, prefix: "", bindings: nil))
         let outputNode = try builder.call("mx_output_" + output.type.metalSuffix(), [value, builder.texcoord, builder.parametersArgument])
-        let stitchingGraph = MTLFunctionStitchingGraph(functionName: functionName, nodes: builder.functionNodes, outputNode: outputNode, attributes: [])
-        let descriptor = MTLStitchedLibraryDescriptor()
-        descriptor.functionGraphs = [stitchingGraph]
-        descriptor.functions = Array(builder.functions.values)
-        let library = try nodeLibrary.device.makeLibrary(stitchedDescriptor: descriptor)
-        guard let function = library.makeFunction(name: functionName) else {
-            throw MaterialXError.invalidDocument("stitched library is missing \(functionName)")
+        let key = functionName + "\n" + builder.topology.joined(separator: "\n")
+        let (library, function) = try nodeLibrary.stitchedFunction(key: key) {
+            let stitchingGraph = MTLFunctionStitchingGraph(functionName: functionName, nodes: builder.functionNodes, outputNode: outputNode, attributes: [])
+            let descriptor = MTLStitchedLibraryDescriptor()
+            descriptor.functionGraphs = [stitchingGraph]
+            descriptor.functions = Array(builder.functions.values)
+            let library = try nodeLibrary.device.makeLibrary(stitchedDescriptor: descriptor)
+            guard let function = library.makeFunction(name: functionName) else {
+                throw MaterialXError.invalidDocument("stitched library is missing \(functionName)")
+            }
+            return (library, function)
         }
         return StitchedGraph(library: library, function: function, functionName: functionName, outputType: output.type, parameters: builder.parameters, parameterData: builder.parameterData)
     }
@@ -147,9 +176,22 @@ private struct Builder {
         slotPointer = parametersArgument
     }
 
+    /// One line per function node: its name and the wiring of its arguments. Identifies the stitched function.
+    var topology: [String] = []
+    var nodeIndices: [ObjectIdentifier: Int] = [:]
+
+    func topologyName(_ node: MTLFunctionStitchingNode) -> String {
+        if let input = node as? MTLFunctionStitchingInputNode {
+            return "arg\(input.argumentIndex)"
+        }
+        return "n\(nodeIndices[ObjectIdentifier(node)] ?? -1)"
+    }
+
     mutating func call(_ name: String, _ arguments: [MTLFunctionStitchingNode]) throws -> MTLFunctionStitchingFunctionNode {
         functions[name] = try stitcher.nodeLibrary.function(named: name)
         let node = MTLFunctionStitchingFunctionNode(name: name, arguments: arguments, controlDependencies: [])
+        topology.append(name + "(" + arguments.map(topologyName).joined(separator: ",") + ")")
+        nodeIndices[ObjectIdentifier(node)] = functionNodes.count
         functionNodes.append(node)
         return node
     }
