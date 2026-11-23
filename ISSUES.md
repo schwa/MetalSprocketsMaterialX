@@ -476,15 +476,23 @@ Every stitch() call builds a new MTLStitchedLibrary. Two materials with the same
 ## 28: Stitching cost and runtime performance are unmeasured
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:m, area:stitching, area:performance
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T12:55:47Z
+updated: 2026-11-23T13:26:04Z
+closed: 2026-11-23T13:26:04Z
 +++
 
 No numbers for stitch time, pipeline link time (binary vs static linking), or GPU time of a stitched material compared with hand-written or MaterialX-generated MSL. MetalSprocketsParticles has a stitching timing harness that could be compared with.
+
+- `2026-11-23T13:26:04Z`: StitchingPerformanceTests (MX_STITCHING_TIMINGS=1) measures stitch time, pipeline link time for direct private linking vs binary function + visible function table (MetalSprockets' .binary linking), and GPU time over 1M threads vs the same math hand-written. Release, M-series, chains of multiply/add:
+nodes | stitch ms | link private | link binary+table | GPU private | GPU binary+table | GPU hand-written
+10 | 0.37 | 1.92 | 0.25 | 0.054 | 0.030 | 0.021
+50 | 0.67 | 0.13 | 0.09 | 0.031 | 0.056 | 0.022
+200 | 41.2 | 27.3 | 12.9 | 0.251 | 0.188 | 0.020
+Numbers are noisy (Metal's shader cache makes repeated graphs fast). Hand-written wins mostly because its constants are literals the compiler folds, while stitched constants come from the parameter buffer (#30). Findings: binary functions cannot satisfy a direct [[visible]] call ('unresolved visible function reference'), only a visible function table; and stitching recursed once per node, overflowing a secondary thread's stack at ~40 nodes (fixed in this commit, DeepGraphTests).
 
 ---
 

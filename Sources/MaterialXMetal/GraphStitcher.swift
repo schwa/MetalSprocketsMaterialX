@@ -209,8 +209,38 @@ private struct Builder {
         return node
     }
 
+    /// Resolves `nodeName`'s upstream nodes first, deepest first, with an explicit stack. Each ``resolve`` then finds
+    /// its inputs already cached, so recursion depth stays small however long a chain is.
+    mutating func resolveUpstream(of nodeName: String, in scope: Scope) throws {
+        var order: [(name: String, output: String?)] = []
+        var visited: Set<String> = []
+        var stack: [(name: String, output: String?, expanded: Bool)] = [(nodeName, nil, false)]
+        while let (name, output, expanded) = stack.popLast() {
+            if expanded {
+                order.append((name, output))
+                continue
+            }
+            let key = name + "." + (output ?? "")
+            guard !visited.contains(key), let node = scope.graph.nodes[name] else { continue }
+            visited.insert(key)
+            stack.append((name, output, true))
+            for input in node.inputs {
+                if let upstream = input.nodeName {
+                    stack.append((upstream, input.output, false))
+                }
+            }
+        }
+        // The last entry is `nodeName` itself; the caller resolves it.
+        for (name, output) in order.dropLast() where scope.graph.nodes[name] != nil {
+            _ = try resolve(nodeName: name, output: output, in: scope, resolvingUpstream: false)
+        }
+    }
+
     /// The stitching node for `output` of `nodeName` (the only output when `nil`).
-    mutating func resolve(nodeName: String, output outputName: String? = nil, in scope: Scope) throws -> MTLFunctionStitchingNode {
+    mutating func resolve(nodeName: String, output outputName: String? = nil, in scope: Scope, resolvingUpstream: Bool = true) throws -> MTLFunctionStitchingNode {
+        if resolvingUpstream, resolved[scope.prefix + nodeName + (outputName.map { "." + $0 } ?? "")] == nil {
+            try resolveUpstream(of: nodeName, in: scope)
+        }
         let nodeKey = scope.prefix + nodeName
         let key = nodeKey + (outputName.map { "." + $0 } ?? "")
         if let node = resolved[key] {

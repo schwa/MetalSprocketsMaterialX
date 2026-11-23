@@ -55,7 +55,9 @@ struct StitchingTests {
         let pipeline = try device.makeComputePipelineState(descriptor: descriptor, options: [], reflection: nil)
         let count = 4
         let output = try #require(device.makeBuffer(length: MemoryLayout<SIMD4<Float>>.stride * count))
-        let parameters = try #require(device.makeBuffer(bytes: graph.parameterData, length: MemoryLayout<SIMD4<Float>>.stride * max(graph.parameterData.count, 1)))
+        // Pad to one slot: Metal rejects zero-length buffers, and copying 16 bytes from an empty array over-reads.
+        let padded = graph.parameterData.isEmpty ? [SIMD4<Float>.zero] : graph.parameterData
+        let parameters = try #require(device.makeBuffer(bytes: padded, length: MemoryLayout<SIMD4<Float>>.stride * padded.count))
         let queue = try #require(device.makeCommandQueue())
         let commandBuffer = try #require(queue.makeCommandBuffer())
         let encoder = try #require(commandBuffer.makeComputeCommandEncoder())

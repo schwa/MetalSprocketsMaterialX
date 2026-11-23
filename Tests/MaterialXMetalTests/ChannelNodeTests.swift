@@ -393,3 +393,39 @@ struct ColorSpaceAndUnitTests {
         #expect(abs(try evaluate(xml, type: "float") { $0.targetUnits["distance"] = "millimeter" }.x - 100) < 1e-4)
     }
 }
+
+/// Found while measuring #28: resolving a node recursed once per upstream node, so a chain of ~40 nodes overflowed
+/// the 512 KB stack of a Swift Testing (or any secondary) thread and crashed.
+@Suite(.serialized)
+struct DeepGraphTests {
+    @Test func longChainStitches() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let count = 300
+        var nodes = "<constant name=\"n0\" type=\"float\"><input name=\"value\" type=\"float\" value=\"0\" /></constant>"
+        for index in 1...count {
+            nodes += "<add name=\"n\(index)\" type=\"float\"><input name=\"in1\" type=\"float\" nodename=\"n\(index - 1)\" /><input name=\"in2\" type=\"float\" value=\"1\" /></add>"
+        }
+        let xml = "<materialx version=\"1.39\"><nodegraph name=\"g\">\(nodes)<output name=\"out\" type=\"float\" nodename=\"n\(count)\" /></nodegraph></materialx>"
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let stitched = try stitcher.stitch(try #require(Document(data: Data(xml.utf8)).nodeGraph("g")), functionName: "materialx_graph")
+        #expect(try StitchingTests().evaluate(stitched, device: device, returnType: "float")[0].x == Float(count))
+    }
+
+    @Test func cycleIsReported() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let xml = """
+        <materialx version="1.39"><nodegraph name="g">
+          <add name="a" type="float"><input name="in1" type="float" nodename="b" /></add>
+          <add name="b" type="float"><input name="in1" type="float" nodename="a" /></add>
+          <output name="out" type="float" nodename="a" />
+        </nodegraph></materialx>
+        """
+        let stitcher = try GraphStitcher(nodeLibrary: MetalNodeLibrary(device: device))
+        let graph = try #require(try Document(data: Data(xml.utf8)).nodeGraph("g"))
+        #expect {
+            try stitcher.stitch(graph, functionName: "materialx_graph")
+        } throws: { error in
+            if case .cycle = error as? MaterialXError { true } else { false }
+        }
+    }
+}
