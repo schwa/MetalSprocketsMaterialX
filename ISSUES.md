@@ -1402,3 +1402,29 @@ created: 2026-11-23T14:32:25Z
 surface, surfacematerial, volume, volumematerial and the lama_* shaders have no implementation. Acceptance: a lama surface graph stitches end to end. Part of #33.
 
 ---
+
+## 75: Codebase not yet reviewed for Swift concurrency adoption
+
++++
+status: new
+priority: none
+kind: none
+created: 2026-11-23T14:35:19Z
++++
+
+Do a swift concurrency pass.
+
+---
+
+## 76: Performance not benchmarked or syst
+
++++
+status: new
+priority: none
+kind: none
+created: 2026-11-23T14:35:39Z
++++
+
+Do a performance pass. Benchmark then autoresearch.
+
+---
