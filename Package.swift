@@ -22,6 +22,7 @@ let package = Package(
         .package(url: "https://github.com/schwa/MetalSprockets", .upToNextMinor(from: "0.3.10")),
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", .upToNextMinor(from: "0.4.1")),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
+        .package(url: "https://github.com/schwa/GoldenImage", .upToNextMinor(from: "0.1.7")),
     ],
     targets: [
         .target(
@@ -64,10 +65,11 @@ let package = Package(
                 "MaterialXMetal",
                 "MetalSprocketsMaterialX",
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
+                .product(name: "GoldenImage", package: "GoldenImage"),
             ],
             // node-coverage.txt is read from the source tree, so it can be regenerated in place.
             exclude: ["Resources/node-coverage.txt"],
-            resources: [.copy("Resources/stdlib_genglsl_impl.mtlx"), .copy("Resources/Corpus")]
+            resources: [.copy("Resources/stdlib_genglsl_impl.mtlx"), .copy("Resources/Corpus"), .copy("Resources/Golden Images")]
         ),
     ]
 )

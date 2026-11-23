@@ -201,6 +201,8 @@ updated: 2026-11-23T12:55:47Z
 
 StandardLibrary.metal covers add, subtract, multiply, divide, min, max, mix, combine3 and two converts. stdlib_defs.mtlx has ~690 nodedefs. Missing math: modulo, fract, invert, absval, sign, floor, ceil, round, power, safepower, sin/cos/tan/asin/acos/atan2, sqrt, ln, exp, clamp, normalize, magnitude, distance, dotproduct, crossproduct, transformpoint/vector/normal, transformmatrix, normalmap, creatematrix, transpose, determinant, invertmatrix, rotate2d, rotate3d, reflect, refract, place2d, trianglewave, etc.
 
+- `2026-11-23T14:11:39Z`: Partly done along the way (#47 and earlier): absval, sign, clamp, sqrt, floor, ceil, round, fract, sin, cos, tan, ln, exp, modulo, power, dotproduct, transformmatrix. Coverage baseline tracks the rest.
+
 ---
 
 ## 12: Channel and conversion nodes are missing
@@ -876,19 +878,21 @@ Reality Composer Pro and USD files on this machine use Apple's MaterialX extensi
 ## 47: No golden-image tests of rendered materials
 
 +++
-status: open
+status: closed
 priority: high
 kind: task
 labels: effort:m, area:testing
 depends: 41
 created: 2026-11-23T12:40:29Z
-updated: 2026-11-23T13:03:12Z
+updated: 2026-11-23T14:11:39Z
+closed: 2026-11-23T14:11:39Z
 +++
 
 There is no rendering test. GoldenImage is used by the other packages for this. The MaterialX test suite materials (resources/Materials/TestSuite in the MaterialX repo) are not on disk and are not vendored.
 
 - `2026-11-23T13:03:12Z`: Question 1 (decision): Add golden-image tests (GoldenImage package) once #41 provides a render element, starting with a flat unlit quad per test material? Recommended: Yes
 - `2026-11-23T13:42:27Z`: Answer 1: YES (user: assume yes for all recommendations)
+- `2026-11-23T14:11:39Z`: Per #47-Q1: GoldenImageTests renders one flat unlit quad per test material with MaterialXUnlitSurface (128×128, offscreen) and compares with PNGs in Tests/MaterialXMetalTests/Resources/Golden Images via the GoldenImage package (PSNR 40). Materials: uv-gradient, checker (floor/dotproduct/modulo/mix), hsv-sweep (separate2/combine3/hsvtorgb), srgb-decode (cmlib). differentMaterialDoesNotMatch guards the threshold. Record with MX_RECORD_GOLDEN=1. To make the checker work, added floor, ceil, round, fract, sin, cos, tan, ln, exp and modulo (all covered by the reference-expression test). Also fixed a casualty of the #10 rename: the unsupportedNode error text read 'MaterialXNode has no Metal implementation'.
 
 ---
 

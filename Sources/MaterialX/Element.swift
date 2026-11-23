@@ -40,7 +40,7 @@ public enum MaterialXError: Error, Equatable, CustomStringConvertible {
         case let .parse(message): "MaterialX parse error: \(message)"
         case let .invalidDocument(message): "Invalid MaterialX document: \(message)"
         case let .missingNodeDef(node): "No nodedef matches node '\(node)'"
-        case let .unsupportedNode(name): "MaterialXNode has no Metal implementation: \(name)"
+        case let .unsupportedNode(name): "Node has no Metal implementation: \(name)"
         case let .invalidValue(value): "Invalid value: \(value)"
         case let .cycle(node): "Nodegraph cycle at '\(node)'"
         case let .stitchingFailed(message): "Function stitching failed: \(message)"
