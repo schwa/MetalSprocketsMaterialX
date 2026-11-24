@@ -14,7 +14,7 @@ let package = Package(
         .library(name: "MaterialX", targets: ["MaterialX"]),
         // Metal node implementations and the nodegraph → MTLFunctionStitchingGraph compiler.
         .library(name: "MaterialXMetal", targets: ["MaterialXMetal"]),
-        // MXShadingContext.h and the node library, for shaders that call stitched functions (SceneSprockets' PBR).
+        // MXShadingContext.h and the node library, for shaders that call stitched functions (e.g. downstream PBR shaders).
         .library(name: "MaterialXMetalShaders", targets: ["MaterialXMetalShaders"]),
         // MetalSprockets integration.
         .library(name: "MetalSprocketsMaterialX", targets: ["MetalSprocketsMaterialX"]),

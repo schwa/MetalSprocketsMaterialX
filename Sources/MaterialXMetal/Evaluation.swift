@@ -63,7 +63,7 @@ public extension StitchedGraph {
 
     /// Dispatches `kernel` (one of the `mx_evaluate_*` kernels) with this graph in its function table. `initial` is
     /// the output buffer's starting contents, one element per context.
-    private func run<Result>(kernel kernelName: String, contexts: [MXShadingContext], initial: [Result], textures: (table: MTLBuffer?, resident: [MTLTexture]), device: MTLDevice?) throws -> [Result] {
+    private func run<Result: BitwiseCopyable>(kernel kernelName: String, contexts: [MXShadingContext], initial: [Result], textures: (table: MTLBuffer?, resident: [MTLTexture]), device: MTLDevice?) throws -> [Result] {
         guard !contexts.isEmpty else { return [] }
         let device = device ?? library.device
         let shaders = try device.makeDefaultLibrary(bundle: .materialXMetalShaders())
